@@ -37,3 +37,4 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 
 Actualizacion
+ recuerda descansar para poder rendir en el trabajo
