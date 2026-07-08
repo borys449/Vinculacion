@@ -1,8 +1,8 @@
 {
-  "development": {
+    "development": {
     "username": "postgres",
-    "password": "123456",
-    "database": "agroindustria",
+    "password": "tu_contraseña_postgres",
+    "database": "finca_lodana",
     "host": "127.0.0.1",
     "dialect": "postgres"
   },

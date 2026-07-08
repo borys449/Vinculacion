@@ -3,19 +3,31 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/context/AuthContext';
 import { HiOutlineMail, HiOutlineLockClosed } from 'react-icons/hi';
 import { GiCorn } from 'react-icons/gi';
+import { loginSchema, LoginSchemaType } from '@/schemas/loginSchema';
 
 export default function LoginPage() {
   const router = useRouter();
   const { login, isAuthenticated } = useAuth();
-  const [formData, setFormData] = useState({
-    user: '',
-    password: '',
-  });
-  const [error, setError] = useState('');
+  const [generalError, setGeneralError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Inicializamos React Hook Form con Zod
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginSchemaType>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      user: '',
+      password: '',
+    },
+  });
 
   // Redirigir si ya está autenticado
   useEffect(() => {
@@ -24,15 +36,16 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
+  // Se ejecuta si Zod valida con éxito los campos vacíos
+  const onSubmit = async (data: LoginSchemaType) => {
+    setGeneralError('');
     setLoading(true);
 
     try {
-      await login(formData);
+      // Pasamos los datos validados como any para evitar rigidez de tipos con el Context
+      await login(data as any);
     } catch (err: any) {
-      setError(err.message || 'Error al iniciar sesión');
+      setGeneralError(err.message || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }
@@ -72,13 +85,13 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {error && (
+          {generalError && (
             <div className="mb-6 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-lg text-sm">
-              {error}
+              {generalError}
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
             {/* Input Usuario */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
@@ -90,15 +103,16 @@ export default function LoginPage() {
                 </div>
                 <input
                   type="text"
-                  value={formData.user}
-                  onChange={(e) =>
-                    setFormData({ ...formData, user: e.target.value })
-                  }
-                  required
                   placeholder="Email o Cédula"
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white text-gray-900 placeholder-gray-400 text-base"
+                  className={`block w-full pl-10 pr-3 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white text-gray-900 placeholder-gray-400 text-base ${
+                    errors.user ? 'border-red-400 focus:ring-red-500' : 'border-gray-300'
+                  }`}
+                  {...register('user')}
                 />
               </div>
+              {errors.user && (
+                <p className="text-xs text-red-600 mt-1.5 ml-1">{errors.user.message}</p>
+              )}
             </div>
 
             {/* Input Contraseña */}
@@ -112,15 +126,16 @@ export default function LoginPage() {
                 </div>
                 <input
                   type="password"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  required
                   placeholder="••••••••"
-                  className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white text-gray-900 placeholder-gray-400 text-base"
+                  className={`block w-full pl-10 pr-3 py-3 border rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white text-gray-900 placeholder-gray-400 text-base ${
+                    errors.password ? 'border-red-400 focus:ring-red-500' : 'border-gray-300'
+                  }`}
+                  {...register('password')}
                 />
               </div>
+              {errors.password && (
+                <p className="text-xs text-red-600 mt-1.5 ml-1">{errors.password.message}</p>
+              )}
             </div>
 
             {/* Botón submit */}

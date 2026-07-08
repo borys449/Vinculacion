@@ -3,6 +3,7 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser'); // 👈 1. El require se queda arriba con los demás
 const { connectDB } = require('./config/database');
 
 const morgan = require('morgan');
@@ -11,15 +12,19 @@ const { errorHandler } = require('./middleware/errorMiddleware');
 // Cargar variables de entorno
 dotenv.config();
 
-const app = express();
+// Inicializar la aplicación Express
+const app = express(); // 👈 2. AQUÍ SE CREA 'app'
 
-// Configuración de seguridad con Helmet
+// Configuración de middlewares globales
+app.use(cookieParser()); // 👈 3. ¡AQUÍ ES EL LUGAR PERFECTO! Justo después de crear 'app'
 app.use(helmet());
 
 // Logging en desarrollo
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
+
+// ... El resto de tu código hacia abajo se queda exactamente igual (CORS, Limiter, Routes, etc.)
 
 // Configuración de CORS con origen específico
 const corsOptions = {

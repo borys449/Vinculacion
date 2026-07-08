@@ -10,6 +10,14 @@ const generarToken = (id) => {
   });
 };
 
+// Configuración base reutilizable para la cookie de sesión
+const cookieOptions = {
+  httpOnly: true, // 🔒 Blindado contra ataques XSS (no accesible vía JavaScript)
+  secure: process.env.NODE_ENV === 'production', // false en desarrollo (HTTP), true en producción (HTTPS)
+  sameSite: 'lax', // Requisito vital para que funcione compartiendo cookies entre diferentes puertos locales
+  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días de duración
+};
+
 // @desc    Registrar nuevo usuario
 // @route   POST /api/auth/registro
 // @access  Public
@@ -62,10 +70,12 @@ exports.registro = async (req, res) => {
     // Generar token
     const token = generarToken(usuario.id);
 
-    res.status(201).json({
+    // 🍪 Inyectar la cookie en la respuesta HTTP
+    res.cookie('token', token, cookieOptions);
+
+    return res.status(201).json({
       success: true,
       message: 'Usuario registrado exitosamente',
-      token,
       data: {
         id: usuario.id,
         nombre: usuario.nombre,
@@ -75,7 +85,7 @@ exports.registro = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: error.message,
     });
@@ -97,7 +107,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Buscar usuario por email o cédula (sin requerir tipo)
+    // Buscar usuario por email o cédula
     const usuario = await Usuario.findOne({
       where: {
         [Op.or]: [{ email: user }, { cedula: user }],
@@ -124,10 +134,12 @@ exports.login = async (req, res) => {
     // Generar token
     const token = generarToken(usuario.id);
 
-    res.status(200).json({
+    // 🍪 Inyectar la cookie en la respuesta HTTP
+    res.cookie('token', token, cookieOptions);
+
+    return res.status(200).json({
       success: true,
       message: 'Login exitoso',
-      token,
       data: {
         id: usuario.id,
         nombre: usuario.nombre,
@@ -138,7 +150,7 @@ exports.login = async (req, res) => {
       },
     });
   } catch (error) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: error.message,
     });
@@ -154,12 +166,34 @@ exports.getMe = async (req, res) => {
       attributes: { exclude: ['password'] },
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: usuario,
     });
   } catch (error) {
-    res.status(400).json({
+    return res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// @desc    Cerrar sesión (Destruir la cookie del navegador)
+// @route   POST /api/auth/logout
+// @access  Private
+exports.logout = async (req, res) => {
+  try {
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
+    return res.status(200).json({
+      success: true,
+      message: 'Sesión cerrada exitosamente',
+    });
+  } catch (error) {
+    return res.status(400).json({
       success: false,
       message: error.message,
     });
@@ -172,7 +206,6 @@ exports.getMe = async (req, res) => {
 exports.updateProfile = async (req, res) => {
   try {
     const { nombre, email, telefono } = req.body;
-
     const usuario = await Usuario.findByPk(req.usuario.id);
 
     if (!usuario) {
@@ -182,7 +215,6 @@ exports.updateProfile = async (req, res) => {
       });
     }
 
-    // Verificar si el email ya existe (si se está cambiando)
     if (email && email !== usuario.email) {
       const emailExiste = await Usuario.findOne({ where: { email } });
       if (emailExiste) {
@@ -203,13 +235,13 @@ exports.updateProfile = async (req, res) => {
       attributes: { exclude: ['password'] },
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Perfil actualizado exitosamente',
       data: usuarioActualizado,
     });
   } catch (error) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: error.message,
     });
@@ -246,7 +278,6 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    // Verificar contraseña actual
     const isMatch = await bcrypt.compare(currentPassword, usuario.password);
 
     if (!isMatch) {
@@ -256,15 +287,14 @@ exports.changePassword = async (req, res) => {
       });
     }
 
-    // Actualizar contraseña
     await usuario.update({ password: newPassword });
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'Contraseña actualizada exitosamente',
     });
   } catch (error) {
-    res.status(400).json({
+    return res.status(400).json({
       success: false,
       message: error.message,
     });
