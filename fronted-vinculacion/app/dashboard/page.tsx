@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link'; // ✅ IMPORTACIÓN AÑADIDA
 import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { StatCard } from '@/components/ui/Card';
@@ -148,7 +149,7 @@ export default function DashboardPage() {
                     Accesos Rápidos
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
-                    <a
+                    <Link
                       href="/cultivos"
                       className="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
                     >
@@ -156,8 +157,8 @@ export default function DashboardPage() {
                       <span className="text-sm font-medium text-gray-700">
                         Cultivos
                       </span>
-                    </a>
-                    <a
+                    </Link>
+                    <Link
                       href="/ganado"
                       className="flex flex-col items-center justify-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                     >
@@ -165,8 +166,8 @@ export default function DashboardPage() {
                       <span className="text-sm font-medium text-gray-700">
                         Ganado
                       </span>
-                    </a>
-                    <a
+                    </Link>
+                    <Link
                       href="/registros"
                       className="flex flex-col items-center justify-center p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
                     >
@@ -174,16 +175,16 @@ export default function DashboardPage() {
                       <span className="text-sm font-medium text-gray-700">
                         Registros
                       </span>
-                    </a>
-                    <a
-                      href="/registros"
+                    </Link>
+                    <Link
+                      href="/registros" // Puedes cambiarlo a /reportes si creas esa ruta en el futuro
                       className="flex flex-col items-center justify-center p-4 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-colors"
                     >
                       <FiTrendingUp className="h-8 w-8 text-yellow-600 mb-2" />
                       <span className="text-sm font-medium text-gray-700">
                         Reportes
                       </span>
-                    </a>
+                    </Link>
                   </div>
                 </div>
               </div>
