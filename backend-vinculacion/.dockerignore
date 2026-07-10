@@ -1,0 +1,11 @@
+node_modules
+.git
+.github
+tests
+docs
+ReporteBackend.md
+*.log
+.env
+coverage
+dist
+build

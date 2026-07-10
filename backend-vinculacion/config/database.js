@@ -1,10 +1,10 @@
 const { Sequelize } = require('sequelize');
 const dotenv = require('dotenv');
 
-dotenv.config();
+dotenv.config({ override: true });
 
 const sequelize = new Sequelize(
-  process.env.DB_NAME || 'finca_lodana',
+  process.env.DB_NAME || 'agroindustria',
   process.env.DB_USER || 'postgres',
   process.env.DB_PASSWORD || '',
   {
@@ -34,7 +34,12 @@ const connectDB = async () => {
     }
   } catch (error) {
     console.error('Error conectando a PostgreSQL:', error.message);
-    process.exit(1);
+
+    if (process.env.NODE_ENV === 'production') {
+      process.exit(1);
+    }
+
+    console.warn('Continuando sin conexión a PostgreSQL en entorno de desarrollo.');
   }
 };
 

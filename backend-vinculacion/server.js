@@ -1,15 +1,18 @@
+require('./otel');
+
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { connectDB } = require('./config/database');
+const { assertJwtSecretConfigured } = require('./config/jwt');
 
 const morgan = require('morgan');
 const { errorHandler } = require('./middleware/errorMiddleware');
 
 // Cargar variables de entorno
-dotenv.config();
+dotenv.config({ override: true });
 
 const app = express();
 
@@ -49,9 +52,6 @@ app.use('/api/auth/login', loginLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Conectar a la base de datos
-connectDB();
-
 // Cargar modelos para establecer relaciones
 require('./models');
 
@@ -76,7 +76,14 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en puerto ${PORT}`);
-  console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
-});
+if (require.main === module) {
+  assertJwtSecretConfigured();
+  connectDB();
+
+  app.listen(PORT, () => {
+    console.log(`Servidor corriendo en puerto ${PORT}`);
+    console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
+  });
+}
+
+module.exports = app;

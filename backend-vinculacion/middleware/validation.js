@@ -15,15 +15,15 @@ exports.validate = (req, res, next) => {
 
 // Validaciones para autenticación
 exports.validateLogin = [
-  body('user').notEmpty().withMessage('Usuario o email es requerido'),
-  body('password').notEmpty().withMessage('La contraseña es requerida'),
+  body('user').notEmpty().isLength({ max: 255 }).withMessage('Usuario o email es requerido'),
+  body('password').notEmpty().isLength({ max: 255 }).withMessage('La contraseña es requerida'),
 ];
 
 exports.validateUsuario = [
   body('nombre')
     .notEmpty()
     .withMessage('El nombre es requerido')
-    .isLength({ min: 3 })
+    .isLength({ min: 3, max: 255 })
     .withMessage('El nombre debe tener al menos 3 caracteres'),
   body('cedula')
     .notEmpty()
@@ -34,6 +34,7 @@ exports.validateUsuario = [
   body('telefono')
     .notEmpty()
     .withMessage('El teléfono es requerido')
+    .isLength({ max: 20 })
     .matches(/^[0-9]{10}$/)
     .withMessage('Teléfono inválido (10 dígitos)'),
   body('area')
@@ -49,7 +50,7 @@ exports.validateUsuario = [
     .isIn(['trabajador', 'administrador'])
     .withMessage('Tipo de usuario inválido'),
   body('password')
-    .isLength({ min: 6 })
+    .isLength({ min: 6, max: 255 })
     .withMessage('La contraseña debe tener al menos 6 caracteres'),
   body('confirmPassword').custom((value, { req }) => {
     if (value !== req.body.password) {
@@ -61,7 +62,10 @@ exports.validateUsuario = [
 
 // Validaciones para cultivos
 exports.validateCultivo = [
-  body('nombre').notEmpty().withMessage('El nombre del cultivo es requerido'),
+  body('nombre')
+    .notEmpty()
+    .isLength({ max: 255 })
+    .withMessage('El nombre del cultivo es requerido'),
   body('tipo')
     .isIn(['vegetal', 'frutal', 'cereal', 'hortaliza', 'leguminosa', 'otro'])
     .withMessage('Tipo de cultivo inválido'),
@@ -69,7 +73,10 @@ exports.validateCultivo = [
     .isFloat({ min: 0 })
     .withMessage('El área debe ser un número positivo'),
   body('unidad').isIn(['metros', 'hectareas']).withMessage('Unidad inválida'),
-  body('ubicacion').notEmpty().withMessage('La ubicación es requerida'),
+  body('ubicacion')
+    .notEmpty()
+    .isLength({ max: 255 })
+    .withMessage('La ubicación es requerida'),
   body('fechaSiembra').isISO8601().withMessage('Fecha de siembra inválida'),
   body('estado')
     .optional()
@@ -81,6 +88,7 @@ exports.validateCultivo = [
 exports.validateGanado = [
   body('identificacion')
     .notEmpty()
+    .isLength({ max: 255 })
     .withMessage('La identificación es requerida'),
   body('tipo')
     .isIn(['bovino', 'porcino', 'ovino', 'caprino', 'avicola', 'otro'])
@@ -113,7 +121,7 @@ exports.validateRegistro = [
   body('descripcion')
     .notEmpty()
     .withMessage('La descripción es requerida')
-    .isLength({ min: 5 })
+    .isLength({ min: 5, max: 1000 })
     .withMessage('La descripción debe tener al menos 5 caracteres'),
   body('fecha').optional().isISO8601().withMessage('Fecha inválida'),
   body('cantidad')

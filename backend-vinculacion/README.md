@@ -12,7 +12,7 @@ Sistema web completo para la gestión de registros del sector agropecuario, desa
 
 ## 📋 Requisitos
 
-- Node.js (v14 o superior)
+- Node.js (v20 o superior recomendado)
 - PostgreSQL (v12 o superior)
 - pgAdmin 4 (opcional - para gestión de base de datos)
 - npm o yarn
@@ -28,6 +28,8 @@ cd Proyecto-Vinculacion
 2. Instalar dependencias:
 ```bash
 npm install
+    or
+pnpm install
 ```
 
 3. Configurar variables de entorno:
@@ -44,6 +46,8 @@ DB_PASSWORD=tu_contraseña_postgres
 JWT_SECRET=tu_clave_secreta_muy_segura_aqui
 NODE_ENV=development
 ```
+
+Nota: el backend lee `DB_PASSWORD` y requiere `JWT_SECRET` para arrancar; si usas un archivo `.env` local, asegúrate de incluir ambas variables.
 
 4. Crear la base de datos en PostgreSQL:
 
@@ -190,7 +194,7 @@ Content-Type: application/json
 - **Backend**: Node.js, Express.js
 - **Base de Datos**: PostgreSQL con Sequelize ORM
 - **Autenticación**: JWT (JSON Web Tokens)
-- **Seguridad**: bcryptjs para hash de contraseñas
+- **Seguridad**: bcrypt para hash de contraseñas
 
 ## 👥 Tipos de Usuario
 
