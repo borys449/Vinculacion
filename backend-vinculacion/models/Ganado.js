@@ -8,11 +8,12 @@ const Ganado = sequelize.define('Ganado', {
     autoIncrement: true
   },
   identificacion: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(255),
     allowNull: false,
     unique: true,
     validate: {
-      notEmpty: true
+      notEmpty: true,
+      len: [1, 255]
     }
   },
   tipo: {
@@ -23,10 +24,11 @@ const Ganado = sequelize.define('Ganado', {
     }
   },
   raza: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(255),
     allowNull: false,
     validate: {
-      notEmpty: true
+      notEmpty: true,
+      len: [1, 255]
     }
   },
   fechaNacimiento: {
@@ -71,7 +73,9 @@ const Ganado = sequelize.define('Ganado', {
     references: {
       model: 'usuarios',
       key: 'id'
-    }
+    },
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE'
   },
   activo: {
     type: DataTypes.BOOLEAN,

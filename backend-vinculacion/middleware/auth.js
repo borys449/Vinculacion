@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const { Usuario } = require('../models');
+const { getJwtSecret } = require('../config/jwt');
 
 // Middleware para proteger rutas
 exports.protect = async (req, res, next) => {
@@ -24,7 +25,7 @@ exports.protect = async (req, res, next) => {
 
   try {
     // Verificar token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'clave_secreta_default');
+    const decoded = jwt.verify(token, getJwtSecret());
     req.usuario = await Usuario.findByPk(decoded.id);
     
     if (!req.usuario) {

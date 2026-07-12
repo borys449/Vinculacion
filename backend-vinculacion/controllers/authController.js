@@ -1,11 +1,12 @@
 const { Usuario } = require('../models');
 const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
+const { getJwtSecret } = require('../config/jwt');
 
 // Generar JWT Token
 const generarToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET || 'clave_secreta_default', {
+  return jwt.sign({ id }, getJwtSecret(), {
     expiresIn: '30d',
   });
 };

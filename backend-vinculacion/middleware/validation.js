@@ -15,15 +15,16 @@ exports.validate = (req, res, next) => {
 
 // Validaciones para autenticación
 exports.validateLogin = [
-  body('user').notEmpty().withMessage('Usuario o email es requerido'),
-  body('password').notEmpty().withMessage('La contraseña es requerida'),
+  body('user').notEmpty().isLength({ max: 255 }).withMessage('Usuario o email es requerido'),
+  body('password').notEmpty().isLength({ max: 255 }).withMessage('La contraseña es requerida'),
 ];
 
+// Validaciones para usuarios
 exports.validateUsuario = [
   body('nombre')
     .notEmpty()
     .withMessage('El nombre es requerido')
-    .isLength({ min: 3 })
+    .isLength({ min: 3, max: 255 })
     .withMessage('El nombre debe tener al menos 3 caracteres'),
   body('cedula')
     .notEmpty()
@@ -34,6 +35,7 @@ exports.validateUsuario = [
   body('telefono')
     .notEmpty()
     .withMessage('El teléfono es requerido')
+    .isLength({ max: 20 })
     .matches(/^[0-9]{10}$/)
     .withMessage('Teléfono inválido (10 dígitos)'),
   body('area')
@@ -49,7 +51,7 @@ exports.validateUsuario = [
     .isIn(['trabajador', 'administrador'])
     .withMessage('Tipo de usuario inválido'),
   body('password')
-    .isLength({ min: 6 })
+    .isLength({ min: 6, max: 255 })
     .withMessage('La contraseña debe tener al menos 6 caracteres'),
   body('confirmPassword').custom((value, { req }) => {
     if (value !== req.body.password) {
@@ -59,8 +61,7 @@ exports.validateUsuario = [
   }),
 ];
 
-// Validaciones para cultivos
-// Validaciones para cultivos
+// Validaciones para cultivos (¡REESTRUCTURADO Y LIMPIO!)
 exports.validateCultivo = [
   body('nombre')
     .notEmpty()
@@ -90,7 +91,9 @@ exports.validateCultivo = [
   body('ubicacion')
     .notEmpty()
     .withMessage('La ubicación o lote de la finca es requerida')
-    .trim(),
+    .trim()
+    .isLength({ max: 255 })
+    .withMessage('La ubicación no puede exceder los 255 caracteres'),
 
   body('fechaSiembra')
     .notEmpty()
@@ -109,7 +112,7 @@ exports.validateCultivo = [
     }),
 
   body('fechaCosechaEstimada')
-    .optional({ checkFalsy: true }) // Permite que venga vacío si aún no se calcula
+    .optional({ checkFalsy: true })
     .isISO8601()
     .withMessage('Formato de fecha de cosecha estimada inválido (Debe ser AAAA-MM-DD)')
     .custom((value, { req }) => {
@@ -137,31 +140,36 @@ exports.validateCultivo = [
 // Validaciones para ganado
 exports.validateGanado = [
   body('identificacion')
-    .notEmpty()
-    .withMessage('La identificación es requerida'),
+    .optional({ checkFalsy: true }) // 🔒 CAMBIO CLAVE: Permite que vaya vacío para que actúe el autogenerador del backend
+    .isLength({ max: 255 })
+    .withMessage('La identificación no puede exceder los 255 caracteres'),
   body('tipo')
     .isIn(['bovino', 'porcino', 'ovino', 'caprino', 'avicola', 'otro'])
     .withMessage('Tipo de ganado inválido'),
   body('raza').notEmpty().withMessage('La raza es requerida'),
   body('fechaNacimiento')
     .isISO8601()
-    .withMessage('Fecha de nacimiento inválida'),
+    .withMessage('Fecha de nacimiento inválida (Debe ser AAAA-MM-DD)'),
   body('sexo').isIn(['macho', 'hembra']).withMessage('Sexo inválido'),
   body('pesoInicial')
     .optional()
     .isFloat({ min: 0 })
-    .withMessage('Peso inicial inválido'),
+    .withMessage('Peso inicial inválido debe ser un número positivo'),
   body('pesoActual')
     .optional()
     .isFloat({ min: 0 })
-    .withMessage('Peso actual inválido'),
+    .withMessage('Peso actual inválido debe ser un número positivo'),
   body('estadoSalud')
     .optional()
     .isIn(['excelente', 'bueno', 'regular', 'enfermo'])
     .withMessage('Estado de salud inválido'),
+  body('estado')
+    .optional()
+    .isIn(['disponible', 'vendido', 'fallecido']) // 🔄 Control del ciclo de vida contable
+    .withMessage('Estado de disponibilidad inválido'),
 ];
 
-// Validaciones para registros
+// Validaciones para registros financieros
 exports.validateRegistro = [
   body('tipo')
     .isIn(['cultivo', 'ganado', 'mantenimiento', 'produccion', 'venta', 'otro'])
@@ -170,7 +178,7 @@ exports.validateRegistro = [
   body('descripcion')
     .notEmpty()
     .withMessage('La descripción es requerida')
-    .isLength({ min: 5 })
+    .isLength({ min: 5, max: 1000 })
     .withMessage('La descripción debe tener al menos 5 caracteres'),
   body('fecha').optional().isISO8601().withMessage('Fecha inválida'),
   body('cantidad')
@@ -185,8 +193,8 @@ exports.validateRegistro = [
     .optional()
     .isFloat({ min: 0 })
     .withMessage('Los ingresos deben ser positivos'),
-  body('cultivoId').optional().isInt().withMessage('ID de cultivo inválido'),
-  body('ganadoId').optional().isInt().withMessage('ID de ganado inválido'),
+  body('cultivoId').optional({ checkFalsy: true }).isInt().withMessage('ID de cultivo inválido'),
+  body('ganadoId').optional({ checkFalsy: true }).isInt().withMessage('ID de ganado inválido'),
 ];
 
 // Validación de ID en parámetros

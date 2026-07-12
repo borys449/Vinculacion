@@ -15,17 +15,19 @@ const Registro = sequelize.define('Registro', {
     }
   },
   categoria: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(255),
     allowNull: false,
     validate: {
-      notEmpty: true
+      notEmpty: true,
+      len: [1, 255]
     }
   },
   descripcion: {
     type: DataTypes.TEXT,
     allowNull: false,
     validate: {
-      notEmpty: true
+      notEmpty: true,
+      len: [5, 1000]
     }
   },
   fecha: {
@@ -68,7 +70,9 @@ const Registro = sequelize.define('Registro', {
     references: {
       model: 'cultivos',
       key: 'id'
-    }
+    },
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
   },
   ganadoId: {
     type: DataTypes.INTEGER,
@@ -76,7 +80,9 @@ const Registro = sequelize.define('Registro', {
     references: {
       model: 'ganado',
       key: 'id'
-    }
+    },
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
   },
   registradoPorId: {
     type: DataTypes.INTEGER,
@@ -84,7 +90,9 @@ const Registro = sequelize.define('Registro', {
     references: {
       model: 'usuarios',
       key: 'id'
-    }
+    },
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE'
   }
 }, {
   tableName: 'registros',

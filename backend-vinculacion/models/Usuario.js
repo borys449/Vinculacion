@@ -1,6 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
-const bcrypt = require('bcryptjs');
+const bcrypt = require('bcrypt');
 
 const Usuario = sequelize.define('Usuario', {
   id: {
@@ -9,34 +9,38 @@ const Usuario = sequelize.define('Usuario', {
     autoIncrement: true
   },
   nombre: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(255),
     allowNull: false,
     validate: {
-      notEmpty: true
+      notEmpty: true,
+      len: [3, 255]
     }
   },
   cedula: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(20),
     allowNull: false,
     unique: true,
     validate: {
-      notEmpty: true
+      notEmpty: true,
+      len: [10, 20]
     }
   },
   email: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(255),
     allowNull: false,
     unique: true,
     validate: {
       isEmail: true,
-      notEmpty: true
+      notEmpty: true,
+      len: [5, 255]
     }
   },
   telefono: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(20),
     allowNull: false,
     validate: {
-      notEmpty: true
+      notEmpty: true,
+      len: [7, 20]
     }
   },
   area: {
@@ -54,7 +58,7 @@ const Usuario = sequelize.define('Usuario', {
     }
   },
   password: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(255),
     allowNull: false,
     validate: {
       len: [6, 255]

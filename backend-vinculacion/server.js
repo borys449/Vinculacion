@@ -1,30 +1,31 @@
+require('./otel');
+
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const cookieParser = require('cookie-parser'); // 👈 1. El require se queda arriba con los demás
+const cookieParser = require('cookie-parser'); // 
 const { connectDB } = require('./config/database');
+const { assertJwtSecretConfigured } = require('./config/jwt');
 
 const morgan = require('morgan');
 const { errorHandler } = require('./middleware/errorMiddleware');
 
 // Cargar variables de entorno
-dotenv.config();
+dotenv.config({ override: true });
 
 // Inicializar la aplicación Express
-const app = express(); // 👈 2. AQUÍ SE CREA 'app'
+const app = express(); // 
 
 // Configuración de middlewares globales
-app.use(cookieParser()); // 👈 3. ¡AQUÍ ES EL LUGAR PERFECTO! Justo después de crear 'app'
+app.use(cookieParser()); 
 app.use(helmet());
 
 // Logging en desarrollo
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
-
-// ... El resto de tu código hacia abajo se queda exactamente igual (CORS, Limiter, Routes, etc.)
 
 // Configuración de CORS con origen específico
 const corsOptions = {
@@ -54,9 +55,6 @@ app.use('/api/auth/login', loginLimiter);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Conectar a la base de datos
-connectDB();
-
 // Cargar modelos para establecer relaciones
 require('./models');
 
@@ -81,11 +79,17 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;
 
+// Levantar el servidor solo si no estamos en entorno de pruebas y si es el archivo principal
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, () => {
-    console.log(`Servidor corriendo en puerto ${PORT}`);
-    console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
-  });
-}
+  if (require.main === module) {
+    assertJwtSecretConfigured();
+    connectDB();
+
+    app.listen(PORT, () => {
+      console.log(`Servidor corriendo en puerto ${PORT}`);
+      console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
+    });
+  }
+} // 👈 Cerramos el bloque de require.main === module y de NODE_ENV !== 'test'
 
 module.exports = app;

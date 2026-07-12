@@ -8,10 +8,11 @@ const Cultivo = sequelize.define('Cultivo', {
     autoIncrement: true
   },
   nombre: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(255),
     allowNull: false,
     validate: {
-      notEmpty: true
+      notEmpty: true,
+      len: [1, 255]
     }
   },
   tipo: {
@@ -35,10 +36,11 @@ const Cultivo = sequelize.define('Cultivo', {
     defaultValue: 'hectareas'
   },
   ubicacion: {
-    type: DataTypes.STRING,
+    type: DataTypes.STRING(255),
     allowNull: false,
     validate: {
-      notEmpty: true
+      notEmpty: true,
+      len: [1, 255]
     }
   },
   fechaSiembra: {
@@ -73,7 +75,9 @@ const Cultivo = sequelize.define('Cultivo', {
     references: {
       model: 'usuarios',
       key: 'id'
-    }
+    },
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE'
   }
 }, {
   tableName: 'cultivos',
