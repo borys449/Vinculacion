@@ -108,10 +108,10 @@ describe('authController.js', () => {
 				expiresIn: '30d',
 			});
 			expect(res.status).toHaveBeenCalledWith(201);
-			expect(res.cookie).toHaveBeenCalledWith('token', 'token-falso', expect.any(Object));
 			expect(res.json).toHaveBeenCalledWith({
 				success: true,
 				message: 'Usuario registrado exitosamente',
+				token: 'token-falso',
 				data: {
 					id: 7,
 					nombre: 'Ana',
@@ -205,10 +205,10 @@ describe('authController.js', () => {
 				expiresIn: '30d',
 			});
 			expect(res.status).toHaveBeenCalledWith(200);
-			expect(res.cookie).toHaveBeenCalledWith('token', 'token-login', expect.any(Object));
 			expect(res.json).toHaveBeenCalledWith({
 				success: true,
 				message: 'Login exitoso',
+				token: 'token-login',
 				data: {
 					id: 7,
 					nombre: 'Ana',

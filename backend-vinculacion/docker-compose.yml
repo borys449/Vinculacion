@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: tu_contraseña_postgres
       POSTGRES_DB: finca_lodana
     ports:
-      - "5433:5432"
+      - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
@@ -25,17 +25,6 @@ services:
       - "5050:80"
     depends_on:
       - postgres-db
-
-  jaeger:
-    image: jaegertracing/all-in-one:1.57
-    container_name: agro_jaeger
-    restart: always
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-    ports:
-      - "16686:16686" # Jaeger Web UI
-      - "4317:4317"   # OTLP gRPC receiver
-      - "4318:4318"   # OTLP HTTP receiver
 
 volumes:
   postgres_data:
