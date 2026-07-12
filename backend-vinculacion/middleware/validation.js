@@ -60,21 +60,78 @@ exports.validateUsuario = [
 ];
 
 // Validaciones para cultivos
+// Validaciones para cultivos
 exports.validateCultivo = [
-  body('nombre').notEmpty().withMessage('El nombre del cultivo es requerido'),
+  body('nombre')
+    .notEmpty()
+    .withMessage('El nombre del cultivo es requerido')
+    .trim()
+    .isLength({ min: 3, max: 50 })
+    .withMessage('El nombre debe tener entre 3 y 50 caracteres'),
+
   body('tipo')
+    .notEmpty()
+    .withMessage('El tipo de cultivo es requerido')
     .isIn(['vegetal', 'frutal', 'cereal', 'hortaliza', 'leguminosa', 'otro'])
-    .withMessage('Tipo de cultivo inválido'),
+    .withMessage('Tipo de cultivo inválido. Valores permitidos: vegetal, frutal, cereal, hortaliza, leguminosa, otro'),
+
   body('area')
-    .isFloat({ min: 0 })
-    .withMessage('El área debe ser un número positivo'),
-  body('unidad').isIn(['metros', 'hectareas']).withMessage('Unidad inválida'),
-  body('ubicacion').notEmpty().withMessage('La ubicación es requerida'),
-  body('fechaSiembra').isISO8601().withMessage('Fecha de siembra inválida'),
+    .notEmpty()
+    .withMessage('El área es requerida')
+    .isFloat({ min: 0.01 })
+    .withMessage('El área debe ser un número positivo mayor a 0'),
+
+  body('unidad')
+    .notEmpty()
+    .withMessage('La unidad de medida es requerida')
+    .isIn(['metros', 'hectareas'])
+    .withMessage('Unidad inválida. Valores permitidos: metros, hectareas'),
+
+  body('ubicacion')
+    .notEmpty()
+    .withMessage('La ubicación o lote de la finca es requerida')
+    .trim(),
+
+  body('fechaSiembra')
+    .notEmpty()
+    .withMessage('La fecha de siembra es requerida')
+    .isISO8601()
+    .withMessage('Formato de fecha de siembra inválido (Debe ser AAAA-MM-DD)')
+    .custom((value) => {
+      const fechaSiembra = new Date(value);
+      const hoy = new Date();
+      // Evitamos que registren siembras con más de un año en el futuro por error
+      hoy.setFullYear(hoy.getFullYear() + 1);
+      if (fechaSiembra > hoy) {
+        throw new Error('La fecha de siembra no puede ser una fecha tan lejana en el futuro');
+      }
+      return true;
+    }),
+
+  body('fechaCosechaEstimada')
+    .optional({ checkFalsy: true }) // Permite que venga vacío si aún no se calcula
+    .isISO8601()
+    .withMessage('Formato de fecha de cosecha estimada inválido (Debe ser AAAA-MM-DD)')
+    .custom((value, { req }) => {
+      if (value && req.body.fechaSiembra) {
+        const fechaSiembra = new Date(req.body.fechaSiembra);
+        const fechaCosecha = new Date(value);
+        if (fechaCosecha <= fechaSiembra) {
+          throw new Error('La fecha de cosecha estimada debe ser posterior a la fecha de siembra');
+        }
+      }
+      return true;
+    }),
+
   body('estado')
     .optional()
     .isIn(['siembra', 'crecimiento', 'floracion', 'cosecha', 'completado'])
-    .withMessage('Estado inválido'),
+    .withMessage('Estado del cultivo inválido. Valores permitidos: siembra, crecimiento, floracion, cosecha, completado'),
+
+  body('responsableId')
+    .optional({ checkFalsy: true })
+    .isInt()
+    .withMessage('El ID del responsable debe ser un número entero válido'),
 ];
 
 // Validaciones para ganado

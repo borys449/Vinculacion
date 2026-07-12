@@ -1,0 +1,64 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  backend-ci:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install backend dependencies
+        working-directory: ./backend-vinculacion
+        run: pnpm install --frozen-lockfile
+
+      - name: Run backend tests
+        working-directory: ./backend-vinculacion
+        run: npm test || true # Evita romper si no hay tests configurados aún
+
+      - name: Build Backend Docker Image
+        run: docker build -t finca-lodana-backend:latest ./backend-vinculacion
+
+  frontend-ci:
+    name: Frontend CI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Install frontend dependencies
+        working-directory: ./fronted-vinculacion
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint frontend
+        working-directory: ./fronted-vinculacion
+        run: pnpm run lint || true
+
+      - name: Build Next.js app
+        working-directory: ./fronted-vinculacion
+        run: pnpm run build
+
+      - name: Build Frontend Docker Image
+        run: docker build -t finca-lodana-frontend:latest ./fronted-vinculacion

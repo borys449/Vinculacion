@@ -40,6 +40,30 @@ exports.obtenerRegistros = async (req, res) => {
   }
 };
 
+// @desc    Obtener resumen financiero
+// @route   GET /api/registros/resumen-financiero
+// @access  Private
+exports.obtenerResumenFinanciero = async (req, res) => {
+  try {
+    const totalIngresos = await Registro.sum('ingresos') || 0;
+    const totalCostos = await Registro.sum('costo') || 0;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        ingresos: parseFloat(totalIngresos),
+        costos: parseFloat(totalCostos),
+        balance: parseFloat(totalIngresos) - parseFloat(totalCostos),
+      },
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 // @desc    Obtener un registro
 // @route   GET /api/registros/:id
 // @access  Private

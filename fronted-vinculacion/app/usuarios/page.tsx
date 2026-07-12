@@ -34,7 +34,7 @@ export default function UsuariosPage() {
     fetchUsuarios();
   }, []);
 
-  const fetchUsuarios = async () => {
+  async function fetchUsuarios() {
     try {
       const response = await usuarioService.getAll();
       if (response.success) {
@@ -45,7 +45,7 @@ export default function UsuariosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

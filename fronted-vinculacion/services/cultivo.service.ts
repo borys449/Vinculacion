@@ -8,10 +8,10 @@ export interface Cultivo {
   unidad: 'metros' | 'hectareas';
   ubicacion: string;
   fechaSiembra: string;
-  fechaCosechaEstimada?: string;
+  fechaCosechaEstimada?: string | null;
   estado: 'siembra' | 'crecimiento' | 'floracion' | 'cosecha' | 'completado';
-  rendimiento?: number;
-  observaciones?: string;
+  rendimiento?: number | null;
+  observaciones?: string | null;
   responsableId: number;
   responsable?: any;
   fechaRegistro: string;

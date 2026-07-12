@@ -19,7 +19,7 @@ services:
     container_name: agro_pgadmin
     restart: always
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@agro.com
+      PGADMIN_DEFAULT_EMAIL: admin@agro.comb
       PGADMIN_DEFAULT_PASSWORD: adminpassword123
     ports:
       - "5050:80"

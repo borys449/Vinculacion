@@ -7,10 +7,10 @@ export interface Ganado {
   raza: string;
   fechaNacimiento: string;
   sexo: 'macho' | 'hembra';
-  pesoInicial?: number;
-  pesoActual?: number;
+  pesoInicial?: number | null;
+  pesoActual?: number | null;
   estadoSalud: 'excelente' | 'bueno' | 'regular' | 'enfermo';
-  observaciones?: string;
+  observaciones?: string | null;
   responsableId: number;
   responsable?: any;
   activo: boolean;

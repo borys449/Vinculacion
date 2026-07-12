@@ -12,9 +12,12 @@ const {
   crearRegistro,
   actualizarRegistro,
   eliminarRegistro,
+  obtenerResumenFinanciero,
 } = require('../controllers/registroController');
 
 router.use(protect);
+
+router.get('/resumen-financiero', obtenerResumenFinanciero);
 
 router
   .route('/')

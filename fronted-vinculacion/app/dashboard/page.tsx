@@ -23,28 +23,17 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
   const fetchDashboardData = async () => {
     try {
-      const [cultivosRes, ganadoRes, registrosRes] = await Promise.all([
+      const [cultivosRes, ganadoRes, registrosRes, resumenRes] = await Promise.all([
         cultivoService.getAll(),
         ganadoService.getAll(),
         registroService.getAll(),
+        registroService.getResumenFinanciero(),
       ]);
 
-      // Calcular totales
-      let totalIngresos = 0;
-      let totalCostos = 0;
-
-      if (registrosRes.success && registrosRes.data) {
-        registrosRes.data.forEach((registro: any) => {
-          if (registro.ingresos) totalIngresos += parseFloat(registro.ingresos);
-          if (registro.costo) totalCostos += parseFloat(registro.costo);
-        });
-      }
+      const totalIngresos = resumenRes.success ? resumenRes.data.ingresos : 0;
+      const totalCostos = resumenRes.success ? resumenRes.data.costos : 0;
 
       setStats({
         cultivos: cultivosRes.count || 0,
@@ -59,6 +48,10 @@ export default function DashboardPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
 
   const balance = stats.ingresos - stats.costos;
 

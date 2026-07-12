@@ -49,6 +49,11 @@ export const registroService = {
     return response.data;
   },
 
+  getResumenFinanciero: async () => {
+    const response = await api.get('/registros/resumen-financiero');
+    return response.data;
+  },
+
   getById: async (id: number) => {
     const response = await api.get(`/registros/${id}`);
     return response.data;

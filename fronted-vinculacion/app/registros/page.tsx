@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import Card from '@/components/ui/Card';
@@ -12,10 +14,10 @@ import { Select, TextArea } from '@/components/ui/Input';
 import {
   registroService,
   Registro,
-  RegistroFormData,
 } from '@/services/registro.service';
 import { cultivoService } from '@/services/cultivo.service';
 import { ganadoService } from '@/services/ganado.service';
+import { registroContableSchema, RegistroContableSchemaType } from '@/schemas/registroContableSchema';
 import { FiPlus, FiEdit, FiTrash2, FiDollarSign } from 'react-icons/fi';
 import { format } from 'date-fns';
 
@@ -26,12 +28,6 @@ export default function RegistrosPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRegistro, setEditingRegistro] = useState<Registro | null>(null);
-  const [formData, setFormData] = useState<RegistroFormData>({
-    tipo: 'cultivo',
-    categoria: '',
-    descripcion: '',
-    fecha: new Date().toISOString().split('T')[0],
-  });
 
   const [totales, setTotales] = useState({
     ingresos: 0,
@@ -39,21 +35,60 @@ export default function RegistrosPage() {
     balance: 0,
   });
 
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    watch,
+    reset,
+    formState: { errors },
+  } = useForm<RegistroContableSchemaType>({
+    resolver: zodResolver(registroContableSchema),
+    defaultValues: {
+      tipo: 'cultivo',
+      categoria: '',
+      descripcion: '',
+      fecha: new Date().toISOString().split('T')[0],
+      cantidad: 0,
+      unidad: '',
+      costo: 0,
+      ingresos: 0,
+      observaciones: '',
+      cultivoId: 0,
+      ganadoId: 0,
+    },
+  });
+
+  const watchTipo = watch('tipo');
+  const watchCategoria = watch('categoria');
+
+  // Limpiar/actualizar campos relacionados si cambia el tipo
+  useEffect(() => {
+    if (!editingRegistro) {
+      setValue('categoria', '');
+      setValue('cultivoId', 0);
+      setValue('ganadoId', 0);
+    }
+  }, [watchTipo, setValue, editingRegistro]);
+
   useEffect(() => {
     fetchData();
   }, []);
 
   const fetchData = async () => {
     try {
-      const [registrosRes, cultivosRes, ganadoRes] = await Promise.all([
+      const [registrosRes, cultivosRes, ganadoRes, resumenRes] = await Promise.all([
         registroService.getAll(),
         cultivoService.getAll(),
         ganadoService.getAll(),
+        registroService.getResumenFinanciero(),
       ]);
 
       if (registrosRes.success) {
         setRegistros(registrosRes.data);
-        calcularTotales(registrosRes.data);
+      }
+      if (resumenRes.success) {
+        setTotales(resumenRes.data);
       }
       if (cultivosRes.success) setCultivos(cultivosRes.data);
       if (ganadoRes.success) setGanado(ganadoRes.data);
@@ -64,53 +99,34 @@ export default function RegistrosPage() {
     }
   };
 
-  const calcularTotales = (data: Registro[]) => {
-    let ingresos = 0;
-    let costos = 0;
-
-    data.forEach((registro) => {
-      if (registro.ingresos)
-        ingresos += parseFloat(registro.ingresos.toString());
-      if (registro.costo) costos += parseFloat(registro.costo.toString());
-    });
-
-    setTotales({
-      ingresos,
-      costos,
-      balance: ingresos - costos,
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const onSubmit = async (data: RegistroContableSchemaType) => {
     try {
       // Limpiar datos antes de enviar
       const cleanData: any = {
-        tipo: formData.tipo,
-        categoria: formData.categoria,
-        descripcion: formData.descripcion,
-        fecha: formData.fecha,
+        tipo: data.tipo,
+        categoria: data.categoria.trim(),
+        descripcion: data.descripcion.trim(),
+        fecha: data.fecha,
+        observaciones: data.observaciones?.trim() || '',
       };
 
-      // Solo agregar campos numéricos si tienen valores válidos
-      if (formData.cantidad && !isNaN(formData.cantidad)) {
-        cleanData.cantidad = formData.cantidad;
+      if (data.cantidad && !isNaN(data.cantidad)) {
+        cleanData.cantidad = data.cantidad;
       }
-      if (formData.costo && !isNaN(formData.costo)) {
-        cleanData.costo = formData.costo;
+      if (data.costo && !isNaN(data.costo)) {
+        cleanData.costo = data.costo;
       }
-      if (formData.ingresos && !isNaN(formData.ingresos)) {
-        cleanData.ingresos = formData.ingresos;
+      if (data.ingresos && !isNaN(data.ingresos)) {
+        cleanData.ingresos = data.ingresos;
       }
+      if (data.unidad) cleanData.unidad = data.unidad;
 
-      // Solo agregar campos opcionales si tienen valores
-      if (formData.unidad) cleanData.unidad = formData.unidad;
-      if (formData.observaciones)
-        cleanData.observaciones = formData.observaciones;
-      if (formData.cultivoId) cleanData.cultivoId = formData.cultivoId;
-      if (formData.ganadoId) cleanData.ganadoId = formData.ganadoId;
-
-      console.log('Datos a enviar:', cleanData);
+      if (data.tipo === 'cultivo' && data.cultivoId) {
+        cleanData.cultivoId = data.cultivoId;
+      }
+      if (data.tipo === 'ganado' && data.ganadoId) {
+        cleanData.ganadoId = data.ganadoId;
+      }
 
       if (editingRegistro) {
         await registroService.update(editingRegistro.id, cleanData);
@@ -121,22 +137,7 @@ export default function RegistrosPage() {
       handleCloseModal();
     } catch (error: any) {
       console.error('Error saving registro:', error);
-      console.error('Error response:', error.response?.data);
-
-      // Mostrar errores de validación específicos
-      if (
-        error.response?.data?.errors &&
-        Array.isArray(error.response.data.errors)
-      ) {
-        const errorMessages = error.response.data.errors
-          .map((e: any) => e.msg)
-          .join('\n');
-        alert(`Errores de validación:\n${errorMessages}`);
-      } else {
-        alert(
-          `Error al guardar: ${error.response?.data?.message || error.message}`
-        );
-      }
+      alert(`Error al guardar: ${error.response?.data?.message || error.message}`);
     }
   };
 
@@ -153,18 +154,18 @@ export default function RegistrosPage() {
 
   const handleEdit = (registro: Registro) => {
     setEditingRegistro(registro);
-    setFormData({
+    reset({
       tipo: registro.tipo,
       categoria: registro.categoria,
       descripcion: registro.descripcion,
       fecha: registro.fecha.split('T')[0],
-      cantidad: registro.cantidad,
-      unidad: registro.unidad,
-      costo: registro.costo,
-      ingresos: registro.ingresos,
-      observaciones: registro.observaciones,
-      cultivoId: registro.cultivoId,
-      ganadoId: registro.ganadoId,
+      cantidad: registro.cantidad || 0,
+      unidad: registro.unidad || '',
+      costo: registro.costo || 0,
+      ingresos: registro.ingresos || 0,
+      observaciones: registro.observaciones || '',
+      cultivoId: registro.cultivoId || 0,
+      ganadoId: registro.ganadoId || 0,
     });
     setModalOpen(true);
   };
@@ -172,13 +173,30 @@ export default function RegistrosPage() {
   const handleCloseModal = () => {
     setModalOpen(false);
     setEditingRegistro(null);
-    setFormData({
+    reset({
       tipo: 'cultivo',
       categoria: '',
       descripcion: '',
       fecha: new Date().toISOString().split('T')[0],
+      cantidad: 0,
+      unidad: '',
+      costo: 0,
+      ingresos: 0,
+      observaciones: '',
+      cultivoId: 0,
+      ganadoId: 0,
     });
   };
+
+  // Filtrado de cultivos según la categoría
+  const filteredCultivos = cultivos.filter(
+    (c) => !watchCategoria || c.tipo.toLowerCase() === watchCategoria.toLowerCase()
+  );
+
+  // Filtrado de ganado según la categoría
+  const filteredGanado = ganado.filter(
+    (g) => !watchCategoria || g.tipo.toLowerCase() === watchCategoria.toLowerCase()
+  );
 
   const columns = [
     {
@@ -325,14 +343,11 @@ export default function RegistrosPage() {
           title={editingRegistro ? 'Editar Registro' : 'Nuevo Registro'}
           size="lg"
         >
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Select
                 label="Tipo de Registro"
-                value={formData.tipo}
-                onChange={(e) =>
-                  setFormData({ ...formData, tipo: e.target.value as any })
-                }
+                error={errors.tipo?.message}
                 options={[
                   { value: 'cultivo', label: 'Cultivo' },
                   { value: 'ganado', label: 'Ganado' },
@@ -341,60 +356,48 @@ export default function RegistrosPage() {
                   { value: 'venta', label: 'Venta' },
                   { value: 'otro', label: 'Otro' },
                 ]}
+                {...register('tipo')}
                 required
               />
 
               <Input
                 label="Categoría"
-                value={formData.categoria}
-                onChange={(e) =>
-                  setFormData({ ...formData, categoria: e.target.value })
-                }
-                placeholder="Ej: Fertilizante, Semillas, etc."
+                error={errors.categoria?.message}
+                placeholder="Ej: Fertilizante, Alimento, Vacunas, etc."
+                {...register('categoria')}
+                suggestions={Array.from(new Set(registros.map((r) => r.categoria).filter(Boolean)))}
                 required
               />
 
               <Input
                 label="Fecha"
                 type="date"
-                value={formData.fecha}
-                onChange={(e) =>
-                  setFormData({ ...formData, fecha: e.target.value })
-                }
+                error={errors.fecha?.message}
+                {...register('fecha')}
                 required
               />
 
-              {formData.tipo === 'cultivo' && (
+              {watchTipo === 'cultivo' && (
                 <Select
                   label="Cultivo Relacionado"
-                  value={formData.cultivoId || ''}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      cultivoId: parseInt(e.target.value),
-                    })
-                  }
-                  options={cultivos.map((c) => ({
+                  error={errors.cultivoId?.message}
+                  options={filteredCultivos.map((c) => ({
                     value: c.id,
-                    label: c.nombre,
+                    label: `${c.nombre} (${c.tipo})`,
                   }))}
+                  {...register('cultivoId', { valueAsNumber: true })}
                 />
               )}
 
-              {formData.tipo === 'ganado' && (
+              {watchTipo === 'ganado' && (
                 <Select
                   label="Ganado Relacionado"
-                  value={formData.ganadoId || ''}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      ganadoId: parseInt(e.target.value),
-                    })
-                  }
-                  options={ganado.map((g) => ({
+                  error={errors.ganadoId?.message}
+                  options={filteredGanado.map((g) => ({
                     value: g.id,
-                    label: g.identificacion,
+                    label: `${g.identificacion} (${g.raza})`,
                   }))}
+                  {...register('ganadoId', { valueAsNumber: true })}
                 />
               )}
 
@@ -402,24 +405,13 @@ export default function RegistrosPage() {
                 label="Cantidad"
                 type="number"
                 step="0.01"
-                value={formData.cantidad || ''}
-                onChange={(e) => {
-                  const value = e.target.value
-                    ? parseFloat(e.target.value)
-                    : undefined;
-                  setFormData({
-                    ...formData,
-                    cantidad: value,
-                  });
-                }}
+                error={errors.cantidad?.message}
+                {...register('cantidad', { valueAsNumber: true })}
               />
 
               <Select
                 label="Unidad"
-                value={formData.unidad || ''}
-                onChange={(e) =>
-                  setFormData({ ...formData, unidad: e.target.value as any })
-                }
+                error={errors.unidad?.message}
                 options={[
                   { value: 'kg', label: 'Kilogramos' },
                   { value: 'toneladas', label: 'Toneladas' },
@@ -429,58 +421,39 @@ export default function RegistrosPage() {
                   { value: 'hectareas', label: 'Hectáreas' },
                   { value: 'otro', label: 'Otro' },
                 ]}
+                {...register('unidad')}
               />
 
               <Input
                 label="Costo ($)"
                 type="number"
                 step="0.01"
-                value={formData.costo || ''}
-                onChange={(e) => {
-                  const value = e.target.value
-                    ? parseFloat(e.target.value)
-                    : undefined;
-                  setFormData({
-                    ...formData,
-                    costo: value,
-                  });
-                }}
+                error={errors.costo?.message}
+                {...register('costo', { valueAsNumber: true })}
               />
 
               <Input
                 label="Ingresos ($)"
                 type="number"
                 step="0.01"
-                value={formData.ingresos || ''}
-                onChange={(e) => {
-                  const value = e.target.value
-                    ? parseFloat(e.target.value)
-                    : undefined;
-                  setFormData({
-                    ...formData,
-                    ingresos: value,
-                  });
-                }}
+                error={errors.ingresos?.message}
+                {...register('ingresos', { valueAsNumber: true })}
               />
             </div>
 
             <TextArea
               label="Descripción"
-              value={formData.descripcion}
-              onChange={(e) =>
-                setFormData({ ...formData, descripcion: e.target.value })
-              }
+              error={errors.descripcion?.message}
               placeholder="Mínimo 5 caracteres"
+              {...register('descripcion')}
               rows={3}
               required
             />
 
             <TextArea
               label="Observaciones"
-              value={formData.observaciones || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, observaciones: e.target.value })
-              }
+              error={errors.observaciones?.message}
+              {...register('observaciones')}
               rows={2}
             />
 

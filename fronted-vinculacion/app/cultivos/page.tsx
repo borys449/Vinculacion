@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import Card from '@/components/ui/Card';
@@ -9,10 +11,10 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { Select, TextArea } from '@/components/ui/Input';
+import { cultivoSchema, CultivoSchemaType } from '@/schemas/cultivoSchema';
 import {
   cultivoService,
   Cultivo,
-  CultivoFormData,
 } from '@/services/cultivo.service';
 import { FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
 import { format } from 'date-fns';
@@ -22,19 +24,27 @@ export default function CultivosPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCultivo, setEditingCultivo] = useState<Cultivo | null>(null);
-  const [formData, setFormData] = useState<CultivoFormData>({
-    nombre: '',
-    tipo: 'vegetal',
-    area: 0,
-    unidad: 'hectareas',
-    ubicacion: '',
-    fechaSiembra: '',
-    estado: 'siembra',
-  });
 
-  useEffect(() => {
-    fetchCultivos();
-  }, []);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CultivoSchemaType>({
+    resolver: zodResolver(cultivoSchema),
+    defaultValues: {
+      nombre: '',
+      tipo: 'vegetal',
+      area: 0,
+      unidad: 'hectareas',
+      ubicacion: '',
+      fechaSiembra: '',
+      estado: 'siembra',
+      fechaCosechaEstimada: '',
+      rendimiento: 0,
+      observaciones: '',
+    },
+  });
 
   const fetchCultivos = async () => {
     try {
@@ -49,13 +59,26 @@ export default function CultivosPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    fetchCultivos();
+  }, []);
+
+  const onSubmit = async (data: CultivoSchemaType) => {
     try {
+      // Saneamiento de datos antes de enviar
+      const payload = {
+        ...data,
+        nombre: data.nombre.trim(),
+        ubicacion: data.ubicacion.trim(),
+        observaciones: data.observaciones?.trim() || '',
+        fechaCosechaEstimada: data.fechaCosechaEstimada || null,
+        rendimiento: data.rendimiento || null,
+      };
+
       if (editingCultivo) {
-        await cultivoService.update(editingCultivo.id, formData);
+        await cultivoService.update(editingCultivo.id, payload);
       } else {
-        await cultivoService.create(formData);
+        await cultivoService.create(payload);
       }
       fetchCultivos();
       handleCloseModal();
@@ -77,17 +100,17 @@ export default function CultivosPage() {
 
   const handleEdit = (cultivo: Cultivo) => {
     setEditingCultivo(cultivo);
-    setFormData({
+    reset({
       nombre: cultivo.nombre,
-      tipo: cultivo.tipo,
+      tipo: cultivo.tipo as any,
       area: cultivo.area,
-      unidad: cultivo.unidad,
+      unidad: cultivo.unidad as any,
       ubicacion: cultivo.ubicacion,
-      fechaSiembra: cultivo.fechaSiembra,
-      fechaCosechaEstimada: cultivo.fechaCosechaEstimada,
-      estado: cultivo.estado,
-      rendimiento: cultivo.rendimiento,
-      observaciones: cultivo.observaciones,
+      fechaSiembra: cultivo.fechaSiembra ? cultivo.fechaSiembra.split('T')[0] : '',
+      fechaCosechaEstimada: cultivo.fechaCosechaEstimada ? cultivo.fechaCosechaEstimada.split('T')[0] : '',
+      estado: cultivo.estado as any,
+      rendimiento: cultivo.rendimiento || 0,
+      observaciones: cultivo.observaciones || '',
     });
     setModalOpen(true);
   };
@@ -95,7 +118,7 @@ export default function CultivosPage() {
   const handleCloseModal = () => {
     setModalOpen(false);
     setEditingCultivo(null);
-    setFormData({
+    reset({
       nombre: '',
       tipo: 'vegetal',
       area: 0,
@@ -103,6 +126,9 @@ export default function CultivosPage() {
       ubicacion: '',
       fechaSiembra: '',
       estado: 'siembra',
+      fechaCosechaEstimada: '',
+      rendimiento: 0,
+      observaciones: '',
     });
   };
 
@@ -190,23 +216,19 @@ export default function CultivosPage() {
           title={editingCultivo ? 'Editar Cultivo' : 'Nuevo Cultivo'}
           size="lg"
         >
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 label="Nombre del Cultivo"
-                value={formData.nombre}
-                onChange={(e) =>
-                  setFormData({ ...formData, nombre: e.target.value })
-                }
+                error={errors.nombre?.message}
+                {...register('nombre')}
+                suggestions={Array.from(new Set(cultivos.map((c) => c.nombre).filter(Boolean)))}
                 required
               />
 
               <Select
                 label="Tipo"
-                value={formData.tipo}
-                onChange={(e) =>
-                  setFormData({ ...formData, tipo: e.target.value as any })
-                }
+                error={errors.tipo?.message}
                 options={[
                   { value: 'vegetal', label: 'Vegetal' },
                   { value: 'frutal', label: 'Frutal' },
@@ -215,6 +237,7 @@ export default function CultivosPage() {
                   { value: 'leguminosa', label: 'Leguminosa' },
                   { value: 'otro', label: 'Otro' },
                 ]}
+                {...register('tipo')}
                 required
               />
 
@@ -222,41 +245,32 @@ export default function CultivosPage() {
                 label="Área"
                 type="number"
                 step="0.01"
-                value={formData.area}
-                onChange={(e) =>
-                  setFormData({ ...formData, area: parseFloat(e.target.value) })
-                }
+                error={errors.area?.message}
+                {...register('area', { valueAsNumber: true })}
                 required
               />
 
               <Select
                 label="Unidad"
-                value={formData.unidad}
-                onChange={(e) =>
-                  setFormData({ ...formData, unidad: e.target.value as any })
-                }
+                error={errors.unidad?.message}
                 options={[
                   { value: 'metros', label: 'Metros cuadrados' },
                   { value: 'hectareas', label: 'Hectáreas' },
                 ]}
+                {...register('unidad')}
                 required
               />
 
               <Input
                 label="Ubicación"
-                value={formData.ubicacion}
-                onChange={(e) =>
-                  setFormData({ ...formData, ubicacion: e.target.value })
-                }
+                error={errors.ubicacion?.message}
+                {...register('ubicacion')}
                 required
               />
 
               <Select
                 label="Estado"
-                value={formData.estado}
-                onChange={(e) =>
-                  setFormData({ ...formData, estado: e.target.value as any })
-                }
+                error={errors.estado?.message}
                 options={[
                   { value: 'siembra', label: 'Siembra' },
                   { value: 'crecimiento', label: 'Crecimiento' },
@@ -264,51 +278,38 @@ export default function CultivosPage() {
                   { value: 'cosecha', label: 'Cosecha' },
                   { value: 'completado', label: 'Completado' },
                 ]}
+                {...register('estado')}
                 required
               />
 
               <Input
                 label="Fecha de Siembra"
                 type="date"
-                value={formData.fechaSiembra}
-                onChange={(e) =>
-                  setFormData({ ...formData, fechaSiembra: e.target.value })
-                }
+                error={errors.fechaSiembra?.message}
+                {...register('fechaSiembra')}
                 required
               />
 
               <Input
                 label="Fecha de Cosecha Estimada"
                 type="date"
-                value={formData.fechaCosechaEstimada || ''}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    fechaCosechaEstimada: e.target.value,
-                  })
-                }
+                error={errors.fechaCosechaEstimada?.message}
+                {...register('fechaCosechaEstimada')}
               />
 
               <Input
                 label="Rendimiento"
                 type="number"
                 step="0.01"
-                value={formData.rendimiento || ''}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    rendimiento: parseFloat(e.target.value),
-                  })
-                }
+                error={errors.rendimiento?.message}
+                {...register('rendimiento', { valueAsNumber: true })}
               />
             </div>
 
             <TextArea
               label="Observaciones"
-              value={formData.observaciones || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, observaciones: e.target.value })
-              }
+              error={errors.observaciones?.message}
+              {...register('observaciones')}
               rows={3}
             />
 

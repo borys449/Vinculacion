@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import Card from '@/components/ui/Card';
@@ -9,10 +11,10 @@ import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import { Select, TextArea } from '@/components/ui/Input';
+import { ganadoSchema, GanadoSchemaType } from '@/schemas/ganadoSchema';
 import {
   ganadoService,
   Ganado,
-  GanadoFormData,
 } from '@/services/ganado.service';
 import { FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
 import { format } from 'date-fns';
@@ -22,19 +24,27 @@ export default function GanadoPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAnimal, setEditingAnimal] = useState<Ganado | null>(null);
-  const [formData, setFormData] = useState<GanadoFormData>({
-    identificacion: '',
-    tipo: 'bovino',
-    raza: '',
-    fechaNacimiento: '',
-    sexo: 'macho',
-    estadoSalud: 'bueno',
-    activo: true,
-  });
 
-  useEffect(() => {
-    fetchGanado();
-  }, []);
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<GanadoSchemaType>({
+    resolver: zodResolver(ganadoSchema),
+    defaultValues: {
+      identificacion: '',
+      tipo: 'bovino',
+      raza: '',
+      fechaNacimiento: '',
+      sexo: 'macho',
+      estadoSalud: 'bueno',
+      pesoInicial: 0,
+      pesoActual: 0,
+      observaciones: '',
+      activo: true,
+    },
+  });
 
   const fetchGanado = async () => {
     try {
@@ -49,13 +59,26 @@ export default function GanadoPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  useEffect(() => {
+    fetchGanado();
+  }, []);
+
+  const onSubmit = async (data: GanadoSchemaType) => {
     try {
+      // Saneamiento de datos antes de enviar
+      const payload = {
+        ...data,
+        identificacion: data.identificacion.trim(),
+        raza: data.raza.trim(),
+        observaciones: data.observaciones?.trim() || '',
+        pesoInicial: data.pesoInicial || null,
+        pesoActual: data.pesoActual || null,
+      };
+
       if (editingAnimal) {
-        await ganadoService.update(editingAnimal.id, formData);
+        await ganadoService.update(editingAnimal.id, payload);
       } else {
-        await ganadoService.create(formData);
+        await ganadoService.create(payload);
       }
       fetchGanado();
       handleCloseModal();
@@ -77,17 +100,33 @@ export default function GanadoPage() {
 
   const handleEdit = (animal: Ganado) => {
     setEditingAnimal(animal);
-    setFormData({
+    reset({
       identificacion: animal.identificacion,
-      tipo: animal.tipo,
+      tipo: animal.tipo as any,
       raza: animal.raza,
-      fechaNacimiento: animal.fechaNacimiento,
-      sexo: animal.sexo,
-      pesoInicial: animal.pesoInicial,
-      pesoActual: animal.pesoActual,
-      estadoSalud: animal.estadoSalud,
-      observaciones: animal.observaciones,
+      fechaNacimiento: animal.fechaNacimiento ? animal.fechaNacimiento.split('T')[0] : '',
+      sexo: animal.sexo as any,
+      pesoInicial: animal.pesoInicial || 0,
+      pesoActual: animal.pesoActual || 0,
+      estadoSalud: animal.estadoSalud as any,
+      observaciones: animal.observaciones || '',
       activo: animal.activo,
+    });
+    setModalOpen(true);
+  };
+
+  const handleOpenNewModal = () => {
+    reset({
+      identificacion: `GAN-${Math.floor(100000 + Math.random() * 900000)}`, // ID Auto-generado
+      tipo: 'bovino',
+      raza: '',
+      fechaNacimiento: '',
+      sexo: 'macho',
+      estadoSalud: 'bueno',
+      pesoInicial: 0,
+      pesoActual: 0,
+      observaciones: '',
+      activo: true,
     });
     setModalOpen(true);
   };
@@ -95,13 +134,16 @@ export default function GanadoPage() {
   const handleCloseModal = () => {
     setModalOpen(false);
     setEditingAnimal(null);
-    setFormData({
+    reset({
       identificacion: '',
       tipo: 'bovino',
       raza: '',
       fechaNacimiento: '',
       sexo: 'macho',
       estadoSalud: 'bueno',
+      pesoInicial: 0,
+      pesoActual: 0,
+      observaciones: '',
       activo: true,
     });
   };
@@ -177,7 +219,7 @@ export default function GanadoPage() {
           title="Gestión de Ganado"
           subtitle="Administra todo el ganado de la finca"
           headerAction={
-            <Button onClick={() => setModalOpen(true)} icon={<FiPlus />}>
+            <Button onClick={handleOpenNewModal} icon={<FiPlus />}>
               Nuevo Animal
             </Button>
           }
@@ -197,23 +239,20 @@ export default function GanadoPage() {
           title={editingAnimal ? 'Editar Animal' : 'Nuevo Animal'}
           size="lg"
         >
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input
                 label="Identificación"
-                value={formData.identificacion}
-                onChange={(e) =>
-                  setFormData({ ...formData, identificacion: e.target.value })
-                }
+                error={errors.identificacion?.message}
+                {...register('identificacion')}
+                readOnly // El ID es auto-generado
+                className="bg-gray-50 cursor-not-allowed font-semibold text-gray-600"
                 required
               />
 
               <Select
                 label="Tipo"
-                value={formData.tipo}
-                onChange={(e) =>
-                  setFormData({ ...formData, tipo: e.target.value as any })
-                }
+                error={errors.tipo?.message}
                 options={[
                   { value: 'bovino', label: 'Bovino' },
                   { value: 'porcino', label: 'Porcino' },
@@ -222,56 +261,47 @@ export default function GanadoPage() {
                   { value: 'avicola', label: 'Avícola' },
                   { value: 'otro', label: 'Otro' },
                 ]}
+                {...register('tipo')}
                 required
               />
 
               <Input
                 label="Raza"
-                value={formData.raza}
-                onChange={(e) =>
-                  setFormData({ ...formData, raza: e.target.value })
-                }
+                error={errors.raza?.message}
+                {...register('raza')}
+                suggestions={Array.from(new Set(ganado.map((g) => g.raza).filter(Boolean)))}
                 required
               />
 
               <Input
                 label="Fecha de Nacimiento"
                 type="date"
-                value={formData.fechaNacimiento}
-                onChange={(e) =>
-                  setFormData({ ...formData, fechaNacimiento: e.target.value })
-                }
+                error={errors.fechaNacimiento?.message}
+                {...register('fechaNacimiento')}
                 required
               />
 
               <Select
                 label="Sexo"
-                value={formData.sexo}
-                onChange={(e) =>
-                  setFormData({ ...formData, sexo: e.target.value as any })
-                }
+                error={errors.sexo?.message}
                 options={[
                   { value: 'macho', label: 'Macho' },
                   { value: 'hembra', label: 'Hembra' },
                 ]}
+                {...register('sexo')}
                 required
               />
 
               <Select
                 label="Estado de Salud"
-                value={formData.estadoSalud}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    estadoSalud: e.target.value as any,
-                  })
-                }
+                error={errors.estadoSalud?.message}
                 options={[
                   { value: 'excelente', label: 'Excelente' },
                   { value: 'bueno', label: 'Bueno' },
                   { value: 'regular', label: 'Regular' },
                   { value: 'enfermo', label: 'Enfermo' },
                 ]}
+                {...register('estadoSalud')}
                 required
               />
 
@@ -279,35 +309,23 @@ export default function GanadoPage() {
                 label="Peso Inicial (kg)"
                 type="number"
                 step="0.01"
-                value={formData.pesoInicial || ''}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    pesoInicial: parseFloat(e.target.value),
-                  })
-                }
+                error={errors.pesoInicial?.message}
+                {...register('pesoInicial', { valueAsNumber: true })}
               />
 
               <Input
                 label="Peso Actual (kg)"
                 type="number"
                 step="0.01"
-                value={formData.pesoActual || ''}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    pesoActual: parseFloat(e.target.value),
-                  })
-                }
+                error={errors.pesoActual?.message}
+                {...register('pesoActual', { valueAsNumber: true })}
               />
             </div>
 
             <TextArea
               label="Observaciones"
-              value={formData.observaciones || ''}
-              onChange={(e) =>
-                setFormData({ ...formData, observaciones: e.target.value })
-              }
+              error={errors.observaciones?.message}
+              {...register('observaciones')}
               rows={3}
             />
 
