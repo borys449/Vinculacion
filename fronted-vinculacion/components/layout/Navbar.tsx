@@ -3,12 +3,15 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
+import { useTheme } from '@/context/ThemeContext';
 import {
   FiMenu,
   FiBell,
   FiLogOut,
   FiSettings,
   FiChevronDown,
+  FiSun,
+  FiMoon,
 } from 'react-icons/fi';
 
 interface NavbarProps {
@@ -17,6 +20,7 @@ interface NavbarProps {
 
 export default function Navbar({ toggleSidebar }: NavbarProps) {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   return (
@@ -39,6 +43,19 @@ export default function Navbar({ toggleSidebar }: NavbarProps) {
           </div>
 
           <div className="flex items-center space-x-4">
+            {/* Modo Oscuro */}
+            <button
+              onClick={toggleTheme}
+              className="text-gray-500 hover:text-gray-700 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              aria-label="Alternar modo oscuro"
+            >
+              {theme === 'dark' ? (
+                <FiSun className="h-5 w-5 text-yellow-500" />
+              ) : (
+                <FiMoon className="h-5 w-5 text-gray-600" />
+              )}
+            </button>
+
             {/* Notificaciones */}
             <button
               className="text-gray-500 hover:text-gray-700 relative p-2 rounded-lg hover:bg-gray-100"
