@@ -4,7 +4,7 @@ require('dotenv').config({ override: true });
 const databaseName = process.env.DB_NAME || 'finca_lodana';
 const databaseUser = process.env.DB_USER || 'postgres';
 const databasePassword = process.env.DB_PASSWORD || '';
-const databaseHost = process.env.DB_HOST || 'localhost';
+const databaseHost = process.env.DB_HOST || '127.0.0.1';
 const databasePort = Number(process.env.DB_PORT || 5432);
 
 const client = new Client({

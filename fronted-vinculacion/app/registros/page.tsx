@@ -60,7 +60,6 @@ export default function RegistrosPage() {
   });
 
   const watchTipo = watch('tipo');
-  const watchCategoria = watch('categoria');
 
   // Limpiar/actualizar campos relacionados si cambia el tipo
   useEffect(() => {
@@ -188,15 +187,11 @@ export default function RegistrosPage() {
     });
   };
 
-  // Filtrado de cultivos según la categoría
-  const filteredCultivos = cultivos.filter(
-    (c) => !watchCategoria || c.tipo.toLowerCase() === watchCategoria.toLowerCase()
-  );
+  // Mostrar todos los cultivos (evita que se filtren por la categoría del registro, ej: fertilizantes, vacuna)
+  const filteredCultivos = cultivos;
 
-  // Filtrado de ganado según la categoría
-  const filteredGanado = ganado.filter(
-    (g) => !watchCategoria || g.tipo.toLowerCase() === watchCategoria.toLowerCase()
-  );
+  // Mostrar todo el ganado (evita que se filtren por la categoría del registro, ej: fertilizantes, vacuna)
+  const filteredGanado = ganado;
 
   const columns = [
     {

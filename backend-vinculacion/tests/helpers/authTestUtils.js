@@ -1,8 +1,9 @@
-// Crea una respuesta simulada de Express para poder verificar status y JSON sin montar un servidor.
 const createMockResponse = () => {
 	const res = {};
 	res.status = jest.fn().mockReturnValue(res);
 	res.json = jest.fn().mockReturnValue(res);
+	res.cookie = jest.fn().mockReturnValue(res);
+	res.clearCookie = jest.fn().mockReturnValue(res);
 	return res;
 };
 
