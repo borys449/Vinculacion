@@ -1,7 +1,7 @@
 const { Ganado, Usuario } = require('../models');
 const { Op } = require('sequelize');
 
-// @desc    Obtener todo el ganado (Soporta búsquedas y filtros)
+// @desc    Obtener todo el ganado activo
 // @route   GET /api/ganado
 // @access  Private
 exports.obtenerGanado = async (req, res) => {
@@ -28,7 +28,9 @@ exports.obtenerGanado = async (req, res) => {
     }
 
     const ganado = await Ganado.findAll({
-      where: donde, // Si está vacío, Sequelize hace un SELECT * tradicional
+      where: {
+        estado: 'activo' // 🚀 Filtra automáticamente para traer solo los animales activos
+      },
       include: [{
         model: Usuario,
         as: 'responsable',
