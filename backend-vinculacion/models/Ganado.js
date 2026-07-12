@@ -63,6 +63,11 @@ const Ganado = sequelize.define('Ganado', {
     type: DataTypes.ENUM('excelente', 'bueno', 'regular', 'enfermo'),
     defaultValue: 'bueno'
   },
+  estado: {
+    type: DataTypes.ENUM('activo', 'inactivo', 'vendido', 'enfermo', 'gestacion', 'fallecido'),
+    defaultValue: 'activo',
+    allowNull: false
+  },
   observaciones: {
     type: DataTypes.TEXT,
     allowNull: true

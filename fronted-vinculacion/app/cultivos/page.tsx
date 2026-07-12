@@ -16,7 +16,7 @@ import {
   cultivoService,
   Cultivo,
 } from '@/services/cultivo.service';
-import { FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiSearch } from 'react-icons/fi';
 import { format } from 'date-fns';
 
 export default function CultivosPage() {
@@ -24,6 +24,7 @@ export default function CultivosPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCultivo, setEditingCultivo] = useState<Cultivo | null>(null);
+  const [search, setSearch] = useState('');
 
   const {
     register,
@@ -48,7 +49,7 @@ export default function CultivosPage() {
 
   const fetchCultivos = async () => {
     try {
-      const response = await cultivoService.getAll();
+      const response = await cultivoService.getAll(search);
       if (response.success) {
         setCultivos(response.data);
       }
@@ -60,12 +61,15 @@ export default function CultivosPage() {
   };
 
   useEffect(() => {
-    fetchCultivos();
-  }, []);
+    const delayDebounceFn = setTimeout(() => {
+      fetchCultivos();
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [search]);
 
   const onSubmit = async (data: CultivoSchemaType) => {
     try {
-      // Saneamiento de datos antes de enviar
       const payload = {
         ...data,
         nombre: data.nombre.trim(),
@@ -201,6 +205,19 @@ export default function CultivosPage() {
             </Button>
           }
         >
+          <div className="mb-4 flex items-center max-w-md relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-400">
+              <FiSearch />
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar cultivos por nombre o ubicación..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-green-500 focus:border-green-500 text-sm"
+            />
+          </div>
+
           {loading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600"></div>

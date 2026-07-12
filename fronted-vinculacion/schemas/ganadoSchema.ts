@@ -22,6 +22,11 @@ export const ganadoSchema = z.object({
   estadoSalud: z.enum(['excelente', 'bueno', 'regular', 'enfermo'], {
     message: 'Estado de salud no válido',
   }),
+  
+  estado: z.enum(['activo', 'inactivo', 'vendido', 'enfermo', 'gestacion', 'fallecido'], {
+    message: 'Estado de gestión no válido',
+  }),
+
   pesoInicial: z
     .number({ message: 'El peso inicial debe ser un número' })
     .positive('El peso inicial debe ser mayor a cero')
