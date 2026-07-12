@@ -113,6 +113,40 @@ exports.actualizarAnimal = async (req, res) => {
   }
 };
 
+exports.actualizarAnimal = async (req, res) => {
+  try {
+    const animal = await Ganado.findByPk(req.params.id);
+
+    if (!animal) {
+      return res.status(404).json({ success: false, message: 'Animal no encontrado' });
+    }
+
+    let datosActualizar = { ...req.body };
+
+    // LÓGICA DE NEGOCIO: Automatización de alertas clínicas basadas en pesaje técnico
+    if (req.body.pesoActual && animal.pesoInicial) {
+      const pesoActualNum = parseFloat(req.body.pesoActual);
+      const pesoInicialNum = parseFloat(animal.pesoInicial);
+
+      // Si el animal perdió más del 10% de su peso inicial, el backend toma acción clínica autónoma
+      if (pesoActualNum < pesoInicialNum * 0.9) {
+        datosActualizar.estadoSalud = 'enfermo';
+        datosActualizar.observaciones = `[ALERTA AUTOMÁTICA DEL BACKEND]: El animal ha bajado drásticamente de peso. Estado de salud degradado automáticamente a enfermo para revisión veterinaria urgente. ` + (req.body.observaciones || '');
+      }
+    }
+
+    await animal.update(datosActualizar);
+    await animal.reload();
+
+    res.status(200).json({
+      success: true,
+      message: 'Datos del animal actualizados y evaluados por el sistema de control biológico',
+      data: animal
+    });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
 // @desc    Eliminar animal
 // @route   DELETE /api/ganado/:id
 // @access  Private

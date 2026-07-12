@@ -65,21 +65,35 @@ exports.obtenerCultivo = async (req, res) => {
 // @access  Private
 exports.crearCultivo = async (req, res) => {
   try {
+    let datosCultivo = { ...req.body };
+
+    // LÓGICA DE NEGOCIO: Estimador predictivo del ciclo fenológico agrícola
+    if (!datosCultivo.fechaCosechaEstimada && datosCultivo.fechaSiembra) {
+      const fechaSiembra = new Date(datosCultivo.fechaSiembra);
+      
+      // Asignamos meses de maduración estimados según el tipo de cultivo de la base de datos
+      let mesesMaduracion = 3; // Por defecto para vegetales/hortalizas comunes
+      if (datosCultivo.tipo === 'frutal') mesesMaduracion = 12;
+      if (datosCultivo.tipo === 'cereal') mesesMaduracion = 6;
+      if (datosCultivo.tipo === 'leguminosa') mesesMaduracion = 4;
+
+      fechaSiembra.setMonth(fechaSiembra.getMonth() + mesesMaduracion);
+      datosCultivo.fechaCosechaEstimada = fechaSiembra.toISOString().split('T')[0];
+      datosCultivo.observaciones = `[CÓMPUTO AUTOMÁTICO]: Fecha de cosecha estimada proyectada de forma autónoma a ${mesesMaduracion} meses plazo según el tipo de cultivo. ` + (datosCultivo.observaciones || '');
+    }
+
     const cultivo = await Cultivo.create({
-      ...req.body,
+      ...datosCultivo,
       responsableId: req.usuario.id
     });
 
     res.status(201).json({
       success: true,
-      message: 'Cultivo registrado exitosamente',
+      message: 'Cultivo registrado y proyectado cronológicamente con éxito',
       data: cultivo
     });
   } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
+    res.status(400).json({ success: false, message: error.message });
   }
 };
 
