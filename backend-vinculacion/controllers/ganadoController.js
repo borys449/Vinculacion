@@ -1,12 +1,34 @@
 const { Ganado, Usuario } = require('../models');
 const { Op } = require('sequelize');
 
-// @desc    Obtener todo el ganado
+// @desc    Obtener todo el ganado (Soporta búsquedas y filtros)
 // @route   GET /api/ganado
 // @access  Private
 exports.obtenerGanado = async (req, res) => {
   try {
+    const { search, estado, tipo } = req.query;
+    let donde = {};
+
+    // 1. Barra de Búsqueda: Filtra por identificación o raza (insensible a mayúsculas/minúsculas)
+    if (search) {
+      donde[Op.or] = [
+        { identificacion: { [Op.iLike]: `%${search}%` } },
+        { raza: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    // 2. Filtro por Estado de Gestión (activo, vendido, enfermo, etc.)
+    if (estado) {
+      donde.estado = estado;
+    }
+
+    // 3. Filtro por Tipo de Animal (bovino, porcino, etc.)
+    if (tipo) {
+      donde.tipo = tipo;
+    }
+
     const ganado = await Ganado.findAll({
+      where: donde, // Si está vacío, Sequelize hace un SELECT * tradicional
       include: [{
         model: Usuario,
         as: 'responsable',
@@ -28,7 +50,7 @@ exports.obtenerGanado = async (req, res) => {
   }
 };
 
-// @desc    Obtener un animal
+// @desc    Obtener un animal por ID
 // @route   GET /api/ganado/:id
 // @access  Private
 exports.obtenerAnimal = async (req, res) => {
@@ -60,7 +82,7 @@ exports.obtenerAnimal = async (req, res) => {
   }
 };
 
-// @desc    Crear animal
+// @desc    Crear un nuevo animal
 // @route   POST /api/ganado
 // @access  Private
 exports.crearAnimal = async (req, res) => {
@@ -83,7 +105,7 @@ exports.crearAnimal = async (req, res) => {
   }
 };
 
-// @desc    Actualizar animal
+// @desc    Actualizar un animal (Soporta el cambio de estado de forma automática)
 // @route   PUT /api/ganado/:id
 // @access  Private
 exports.actualizarAnimal = async (req, res) => {
@@ -97,6 +119,7 @@ exports.actualizarAnimal = async (req, res) => {
       });
     }
 
+    // Al actualizar dinámicamente con req.body, si pasas el campo 'estado' se guardará solo
     await animal.update(req.body);
     await animal.reload();
 
@@ -113,7 +136,7 @@ exports.actualizarAnimal = async (req, res) => {
   }
 };
 
-// @desc    Eliminar animal
+// @desc    Eliminar un animal
 // @route   DELETE /api/ganado/:id
 // @access  Private
 exports.eliminarAnimal = async (req, res) => {

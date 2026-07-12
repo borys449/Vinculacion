@@ -23,8 +23,11 @@ export type CultivoFormData = Omit<
 >;
 
 export const cultivoService = {
-  getAll: async () => {
-    const response = await api.get('/cultivos');
+  // 👈 Modificado para aceptar la query de búsqueda opcional
+  getAll: async (search?: string) => {
+    const response = await api.get('/cultivos', {
+      params: search ? { search } : {},
+    });
     return response.data;
   },
 
