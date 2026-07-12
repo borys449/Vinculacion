@@ -1,7 +1,12 @@
 const express = require('express');
 const router = express.Router();
 const { protect, autorizar } = require('../middleware/auth');
-const { validateId, validate } = require('../middleware/validation');
+const {
+  validateId,
+  validateUsuarioUpdate,
+  validateAdminChangePassword,
+  validate,
+} = require('../middleware/validation');
 const {
   obtenerUsuarios,
   obtenerUsuario,
@@ -19,9 +24,9 @@ router.route('/').get(obtenerUsuarios);
 router
   .route('/:id')
   .get(validateId, validate, obtenerUsuario)
-  .put(validateId, validate, actualizarUsuario)
+  .put([validateId, ...validateUsuarioUpdate], validate, actualizarUsuario)
   .delete(validateId, validate, eliminarUsuario);
 
-router.put('/:id/password', validateId, validate, cambiarPassword);
+router.put('/:id/password', [validateId, ...validateAdminChangePassword], validate, cambiarPassword);
 
 module.exports = router;

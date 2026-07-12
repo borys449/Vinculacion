@@ -42,7 +42,7 @@ DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=finca_lodana
 DB_USER=postgres
-DB_PASSWORD=tu_contraseña_postgres
+DB_PASSWORD=tu_contrasena_postgres
 JWT_SECRET=tu_clave_secreta_muy_segura_aqui
 NODE_ENV=development
 ```
