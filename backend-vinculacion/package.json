@@ -4,8 +4,8 @@
   "description": "Backend para sistema de gestión agropecuaria Finca LODANA",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",
-    "dev": "nodemon server.js",
+    "start": "npx sequelize-cli db:migrate && node server.js",
+    "dev": "npx sequelize-cli db:migrate && nodemon server.js",
     "test": "jest --runInBand",
     "db:create": "node scripts/createDatabase.js"
   },
