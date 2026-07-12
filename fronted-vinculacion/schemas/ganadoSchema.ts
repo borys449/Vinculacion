@@ -36,6 +36,8 @@ export const ganadoSchema = z.object({
     .or(z.nan()),
   observaciones: z.string().trim().optional(),
   activo: z.boolean(),
+  // 🚀 AGREGAMOS EL CAMPO ESTADO AL VALIDADOR DE ZOD
+  estado: z.enum(['activo', 'inactivo', 'en_cuarentena']).default('activo'),
 });
 
 export type GanadoSchemaType = z.infer<typeof ganadoSchema>;

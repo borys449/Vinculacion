@@ -15,6 +15,8 @@ export interface Ganado {
   responsable?: any;
   activo: boolean;
   fechaRegistro: string;
+  // 🚀 AGREGAMOS LA PROPIEDAD EN LA INTERFAZ DE TS
+  estado: 'activo' | 'inactivo' | 'en_cuarentena';
 }
 
 export type GanadoFormData = Omit<

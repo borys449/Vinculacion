@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
@@ -9,14 +9,10 @@ import Card from '@/components/ui/Card';
 import Table from '@/components/ui/Table';
 import Button from '@/components/ui/Button';
 import Modal from '@/components/ui/Modal';
-import Input from '@/components/ui/Input';
-import { Select, TextArea } from '@/components/ui/Input';
+import Input, { Select, TextArea } from '@/components/ui/Input';
 import { ganadoSchema, GanadoSchemaType } from '@/schemas/ganadoSchema';
-import {
-  ganadoService,
-  Ganado,
-} from '@/services/ganado.service';
-import { FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
+import { ganadoService, Ganado } from '@/services/ganado.service';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiFilter } from 'react-icons/fi';
 import { format } from 'date-fns';
 
 export default function GanadoPage() {
@@ -24,6 +20,10 @@ export default function GanadoPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAnimal, setEditingAnimal] = useState<Ganado | null>(null);
+
+  // Estados para búsqueda y filtrado
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('todos');
 
   const {
     register,
@@ -43,6 +43,7 @@ export default function GanadoPage() {
       pesoActual: 0,
       observaciones: '',
       activo: true,
+      estado: 'activo',
     },
   });
 
@@ -63,9 +64,20 @@ export default function GanadoPage() {
     fetchGanado();
   }, []);
 
-  const onSubmit = async (data: GanadoSchemaType) => {
+  // Lógica de filtrado en tiempo real
+  const filteredGanado = ganado.filter((animal) => {
+    const matchesSearch =
+      animal.identificacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      animal.raza.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === 'todos' || animal.estado === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
+  const onSubmit: SubmitHandler<GanadoSchemaType> = async (data) => {
     try {
-      // Saneamiento de datos antes de enviar
       const payload = {
         ...data,
         identificacion: data.identificacion.trim(),
@@ -111,13 +123,14 @@ export default function GanadoPage() {
       estadoSalud: animal.estadoSalud as any,
       observaciones: animal.observaciones || '',
       activo: animal.activo,
+      estado: animal.estado as any,
     });
     setModalOpen(true);
   };
 
   const handleOpenNewModal = () => {
     reset({
-      identificacion: `GAN-${Math.floor(100000 + Math.random() * 900000)}`, // ID Auto-generado
+      identificacion: `GAN-${Math.floor(100000 + Math.random() * 900000)}`,
       tipo: 'bovino',
       raza: '',
       fechaNacimiento: '',
@@ -127,6 +140,7 @@ export default function GanadoPage() {
       pesoActual: 0,
       observaciones: '',
       activo: true,
+      estado: 'activo',
     });
     setModalOpen(true);
   };
@@ -145,6 +159,7 @@ export default function GanadoPage() {
       pesoActual: 0,
       observaciones: '',
       activo: true,
+      estado: 'activo',
     });
   };
 
@@ -167,23 +182,38 @@ export default function GanadoPage() {
       render: (value?: number) => (value ? `${value} kg` : 'N/A'),
     },
     {
-      key: 'estadoSalud',
+      key: 'estado',
       label: 'Estado',
-      render: (value: string) => (
-        <span
-          className={`px-2 py-1 rounded-full text-xs font-medium ${
-            value === 'excelente'
-              ? 'bg-green-100 text-green-800'
-              : value === 'bueno'
-              ? 'bg-blue-100 text-blue-800'
-              : value === 'regular'
-              ? 'bg-yellow-100 text-yellow-800'
-              : 'bg-red-100 text-red-800'
-          }`}
-        >
-          {value.charAt(0).toUpperCase() + value.slice(1)}
-        </span>
-      ),
+      render: (value: string) => {
+        let badgeStyles = 'bg-gray-100 text-gray-800';
+        if (value === 'activo') badgeStyles = 'bg-green-100 text-green-800';
+        if (value === 'inactivo') badgeStyles = 'bg-orange-100 text-orange-800';
+        if (value === 'en_cuarentena') badgeStyles = 'bg-purple-100 text-purple-800';
+
+        const label = value === 'en_cuarentena' ? 'Cuarentena' : value.charAt(0).toUpperCase() + value.slice(1);
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeStyles}`}>
+            {label}
+          </span>
+        );
+      },
+    },
+    {
+      key: 'estadoSalud',
+      label: 'Salud',
+      render: (value: string) => {
+        let badgeStyles = 'bg-gray-100 text-gray-800';
+        if (value === 'excelente') badgeStyles = 'bg-green-100 text-green-800';
+        if (value === 'bueno') badgeStyles = 'bg-blue-100 text-blue-800';
+        if (value === 'regular') badgeStyles = 'bg-yellow-100 text-yellow-800';
+        if (value === 'enfermo') badgeStyles = 'bg-red-100 text-red-800';
+
+        return (
+          <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeStyles}`}>
+            {value.charAt(0).toUpperCase() + value.slice(1)}
+          </span>
+        );
+      },
     },
     {
       key: 'fechaNacimiento',
@@ -224,12 +254,44 @@ export default function GanadoPage() {
             </Button>
           }
         >
+          {/* Barra de búsqueda y filtrado */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6 items-center justify-between bg-gray-50 p-4 rounded-xl border border-gray-100">
+            <div className="relative w-full md:w-72">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-gray-400">
+                <FiSearch />
+              </span>
+              <input
+                type="text"
+                placeholder="Buscar por ID o Raza..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-9 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+              <span className="text-gray-600 text-sm flex items-center gap-1 font-medium">
+                <FiFilter /> Filtrar por:
+              </span>
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="bg-white border border-gray-300 rounded-lg text-sm text-gray-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all cursor-pointer"
+              >
+                <option value="todos" className="text-gray-900">Todos los Estados</option>
+                <option value="activo" className="text-gray-900">Activos</option>
+                <option value="inactivo" className="text-gray-900">Inactivos</option>
+                <option value="en_cuarentena" className="text-gray-900">En Cuarentena</option>
+              </select>
+            </div>
+          </div>
+
           {loading ? (
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600"></div>
             </div>
           ) : (
-            <Table columns={columns} data={ganado} />
+            <Table columns={columns} data={filteredGanado} />
           )}
         </Card>
 
@@ -245,7 +307,7 @@ export default function GanadoPage() {
                 label="Identificación"
                 error={errors.identificacion?.message}
                 {...register('identificacion')}
-                readOnly // El ID es auto-generado
+                readOnly
                 className="bg-gray-50 cursor-not-allowed font-semibold text-gray-600"
                 required
               />
@@ -302,6 +364,18 @@ export default function GanadoPage() {
                   { value: 'enfermo', label: 'Enfermo' },
                 ]}
                 {...register('estadoSalud')}
+                required
+              />
+
+              <Select
+                label="Estado del Animal"
+                error={errors.estado?.message}
+                options={[
+                  { value: 'activo', label: 'Activo' },
+                  { value: 'inactivo', label: 'Inactivo (Vendido / De Baja)' },
+                  { value: 'en_cuarentena', label: 'En Cuarentena' },
+                ] as any}
+                {...register('estado')}
                 required
               />
 

@@ -5,7 +5,7 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-const cookieParser = require('cookie-parser'); // 
+const cookieParser = require('cookie-parser'); 
 const { connectDB } = require('./config/database');
 const { assertJwtSecretConfigured } = require('./config/jwt');
 
@@ -16,7 +16,7 @@ const { errorHandler } = require('./middleware/errorMiddleware');
 dotenv.config({ override: true });
 
 // Inicializar la aplicación Express
-const app = express(); // 
+const app = express(); 
 
 // Configuración de middlewares globales
 app.use(cookieParser()); 
@@ -56,7 +56,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Cargar modelos para establecer relaciones
-require('./models');
+const db = require('./models');
 
 // Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -85,11 +85,39 @@ if (process.env.NODE_ENV !== 'test') {
     assertJwtSecretConfigured();
     connectDB();
 
-    app.listen(PORT, () => {
+    app.listen(PORT, async () => {
       console.log(`Servidor corriendo en puerto ${PORT}`);
       console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
+
+      // 🚀 VERIFICACIÓN E INYECCIÓN AUTOMÁTICA DE LA COLUMNA "estado"
+      try {
+        const sequelizeInstance = db.sequelize;
+        if (sequelizeInstance) {
+          const queryInterface = sequelizeInstance.getQueryInterface();
+          
+          // Revisamos la estructura actual de la tabla 'ganado' en Postgres
+          const tableDefinition = await queryInterface.describeTable('ganado');
+          
+          // Si la columna 'estado' no existe localmente, se crea sola sin que nadie use comandos
+          if (!tableDefinition.estado) {
+            await queryInterface.addColumn('ganado', 'estado', {
+              type: sequelizeInstance.Sequelize.STRING(50),
+              allowNull: false,
+              defaultValue: 'activo'
+            });
+            console.log('--- Migración automática exitosa: Columna "estado" añadida a la tabla ganado ---');
+          }
+        }
+      } catch (error) {
+        // Captura cualquier inconveniente con credenciales locales (.env) del equipo 
+        // evitando que el backend sufra un crash o apagado repentino.
+        console.log('\n======================================================');
+        console.log('Aviso de BD Local: No se pudo verificar la columna "estado".');
+        console.log('Razón:', error.message);
+        console.log('======================================================\n');
+      }
     });
   }
-} // 👈 Cerramos el bloque de require.main === module y de NODE_ENV !== 'test'
+} 
 
 module.exports = app;
