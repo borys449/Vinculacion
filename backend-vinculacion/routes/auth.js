@@ -11,13 +11,15 @@ const { protect } = require('../middleware/auth');
 const {
   validateLogin,
   validateUsuario,
+  validateProfileUpdate,
+  validateChangePassword,
   validate,
 } = require('../middleware/validation');
 
 router.post('/registro', validateUsuario, validate, registro);
 router.post('/login', validateLogin, validate, login);
 router.get('/me', protect, getMe);
-router.put('/profile', protect, updateProfile);
-router.put('/change-password', protect, changePassword);
+router.put('/profile', protect, validateProfileUpdate, validate, updateProfile);
+router.put('/change-password', protect, validateChangePassword, validate, changePassword);
 
 module.exports = router;
