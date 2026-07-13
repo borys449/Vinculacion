@@ -47,7 +47,7 @@ export default function GanadoPage() {
     },
   });
 
-  // 2. Modificado para obtener todo el ganado y permitir filtrado local reactivo
+  // Obtener todo el ganado desde el servicio
   const fetchGanado = async () => {
     try {
       const response = await ganadoService.getAll();
@@ -61,16 +61,16 @@ export default function GanadoPage() {
     }
   };
 
-  // 3. Se ejecuta al montar el componente
+  // Se ejecuta al montar el componente
   useEffect(() => {
     fetchGanado();
   }, []);
 
-  // Lógica de filtrado en tiempo real
+  // Lógica de filtrado en tiempo real sin romper el renderizado
   const filteredGanado = ganado.filter((animal) => {
     const matchesSearch =
-      animal.identificacion.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      animal.raza.toLowerCase().includes(searchTerm.toLowerCase());
+      (animal.identificacion?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (animal.raza?.toLowerCase() || '').includes(searchTerm.toLowerCase());
 
     const matchesStatus =
       statusFilter === 'todos' || animal.estado === statusFilter;
@@ -94,7 +94,7 @@ export default function GanadoPage() {
       } else {
         await ganadoService.create(payload);
       }
-      fetchGanado();
+      await fetchGanado();
       handleCloseModal();
     } catch (error) {
       console.error('Error saving ganado:', error);
@@ -170,7 +170,6 @@ export default function GanadoPage() {
     activo: 'bg-green-100 text-green-800',
     inactivo: 'bg-gray-100 text-gray-800',
     vendido: 'bg-blue-100 text-blue-800',
-    enfermo: 'bg-amber-100 text-amber-800',
     gestacion: 'bg-purple-100 text-purple-800',
     fallecido: 'bg-red-100 text-red-800',
   };
@@ -226,7 +225,17 @@ export default function GanadoPage() {
     {
       key: 'fechaNacimiento',
       label: 'Nacimiento',
-      render: (value: string) => format(new Date(value), 'dd/MM/yyyy'),
+      render: (value: string) => {
+        if (!value) return 'N/A';
+        try {
+          // Reemplazamos guiones por diagonales para prevenir fallos por zonas horarias ISO locales
+          const fechaSegura = new Date(value.replace(/-/g, '\/'));
+          return format(fechaSegura, 'dd/MM/yyyy');
+        } catch (error) {
+          console.error("Error formateando fecha:", error);
+          return value; 
+        }
+      },
     },
     {
       key: 'acciones',
@@ -290,7 +299,6 @@ export default function GanadoPage() {
                 <option value="activo" className="text-gray-900">Activo</option>
                 <option value="inactivo" className="text-gray-900">Inactivo</option>
                 <option value="vendido" className="text-gray-900">Vendido</option>
-                <option value="enfermo" className="text-gray-900">Enfermo</option>
                 <option value="gestacion" className="text-gray-900">Gestación</option>
                 <option value="fallecido" className="text-gray-900">Fallecido</option>
               </select>
@@ -385,7 +393,6 @@ export default function GanadoPage() {
                   { value: 'activo', label: 'Activo' },
                   { value: 'inactivo', label: 'Inactivo' },
                   { value: 'vendido', label: 'Vendido' },
-                  { value: 'enfermo', label: 'Enfermo' },
                   { value: 'gestacion', label: 'Gestación' },
                   { value: 'fallecido', label: 'Fallecido' },
                 ]}

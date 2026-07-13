@@ -1,18 +1,18 @@
 {
   "name": "finca-lodana-backend",
   "version": "1.0.0",
-  "description": "Backend para sistema de gestión agropecuaria Finca LODANA",
+  "description": "Backend para sistema de gesti\u00f3n agropecuaria Finca LODANA",
   "main": "server.js",
   "scripts": {
-    "start": "npx sequelize-cli db:migrate && node server.js",
-    "dev": "npx sequelize-cli db:migrate && nodemon server.js",
+    "start": "node init && npx sequelize-cli db:migrate && node server.js",
+    "dev": "node init && npx sequelize-cli db:migrate && nodemon server.js",
     "test": "jest --runInBand",
     "db:create": "node scripts/createDatabase.js"
   },
   "keywords": [
     "agropecuario",
     "finca",
-    "gestión"
+    "gesti\u00f3n"
   ],
   "author": "",
   "license": "ISC",
