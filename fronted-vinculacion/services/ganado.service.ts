@@ -10,6 +10,7 @@ export interface Ganado {
   pesoInicial?: number | null;
   pesoActual?: number | null;
   estadoSalud: 'excelente' | 'bueno' | 'regular' | 'enfermo';
+  estado: 'activo' | 'inactivo' | 'vendido' | 'enfermo' | 'gestacion' | 'fallecido'; // 👈 Agregado el nuevo ENUM
   observaciones?: string | null;
   responsableId: number;
   responsable?: any;
@@ -23,8 +24,9 @@ export type GanadoFormData = Omit<
 >;
 
 export const ganadoService = {
-  getAll: async () => {
-    const response = await api.get('/ganado');
+  // Ahora permite recibir filtros opcionales por la URL automáticamente
+  getAll: async (params?: { search?: string; estado?: string; tipo?: string }) => {
+    const response = await api.get('/ganado', { params });
     return response.data;
   },
 

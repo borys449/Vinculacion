@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "targets": {
     "net9.0": {
       "Aspire.Hosting/9.0.0": {
@@ -3985,19 +3985,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\Usuario\\.nuget\\packages\\": {}
+    "C:\\Users\\PC\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\Usuario\\Desktop\\Universidad\\Vinculacion I\\Vinculacion\\aspire\\AspireApp.AppHost\\AspireApp.AppHost.csproj",
+      "projectUniqueName": "C:\\Users\\PC\\Documents\\GitHub\\Vinculacion\\aspire\\AspireApp.AppHost\\AspireApp.AppHost.csproj",
       "projectName": "AspireApp.AppHost",
-      "projectPath": "C:\\Users\\Usuario\\Desktop\\Universidad\\Vinculacion I\\Vinculacion\\aspire\\AspireApp.AppHost\\AspireApp.AppHost.csproj",
-      "packagesPath": "C:\\Users\\Usuario\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\Usuario\\Desktop\\Universidad\\Vinculacion I\\Vinculacion\\aspire\\AspireApp.AppHost\\obj\\",
+      "projectPath": "C:\\Users\\PC\\Documents\\GitHub\\Vinculacion\\aspire\\AspireApp.AppHost\\AspireApp.AppHost.csproj",
+      "packagesPath": "C:\\Users\\PC\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\PC\\Documents\\GitHub\\Vinculacion\\aspire\\AspireApp.AppHost\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
-        "C:\\Users\\Usuario\\AppData\\Roaming\\NuGet\\NuGet.Config"
+        "C:\\Users\\PC\\AppData\\Roaming\\NuGet\\NuGet.Config"
       ],
       "originalTargetFrameworks": [
         "net9.0"
@@ -4007,10 +4007,11 @@
       },
       "frameworks": {
         "net9.0": {
+          "framework": "net9.0",
           "targetAlias": "net9.0",
           "projectReferences": {
-            "C:\\Users\\Usuario\\Desktop\\Universidad\\Vinculacion I\\Vinculacion\\aspire\\AspireApp.ServiceDefaults\\AspireApp.ServiceDefaults.csproj": {
-              "projectPath": "C:\\Users\\Usuario\\Desktop\\Universidad\\Vinculacion I\\Vinculacion\\aspire\\AspireApp.ServiceDefaults\\AspireApp.ServiceDefaults.csproj"
+            "C:\\Users\\PC\\Documents\\GitHub\\Vinculacion\\aspire\\AspireApp.ServiceDefaults\\AspireApp.ServiceDefaults.csproj": {
+              "projectPath": "C:\\Users\\PC\\Documents\\GitHub\\Vinculacion\\aspire\\AspireApp.ServiceDefaults\\AspireApp.ServiceDefaults.csproj"
             }
           }
         }
@@ -4025,10 +4026,11 @@
         "auditLevel": "low",
         "auditMode": "direct"
       },
-      "SdkAnalysisLevel": "10.0.200"
+      "SdkAnalysisLevel": "10.0.300"
     },
     "frameworks": {
       "net9.0": {
+        "framework": "net9.0",
         "targetAlias": "net9.0",
         "dependencies": {
           "Aspire.Hosting.AppHost": {
@@ -4058,19 +4060,19 @@
         "downloadDependencies": [
           {
             "name": "Microsoft.AspNetCore.App.Ref",
-            "version": "[9.0.14, 9.0.14]"
+            "version": "[9.0.17, 9.0.17]"
           },
           {
             "name": "Microsoft.NETCore.App.Host.win-x64",
-            "version": "[9.0.14, 9.0.14]"
+            "version": "[9.0.17, 9.0.17]"
           },
           {
             "name": "Microsoft.NETCore.App.Ref",
-            "version": "[9.0.14, 9.0.14]"
+            "version": "[9.0.17, 9.0.17]"
           },
           {
             "name": "Microsoft.WindowsDesktop.App.Ref",
-            "version": "[9.0.14, 9.0.14]"
+            "version": "[9.0.17, 9.0.17]"
           }
         ],
         "frameworkReferences": {
@@ -4078,7 +4080,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.201/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\10.0.301/PortableRuntimeIdentifierGraph.json"
       }
     }
   }

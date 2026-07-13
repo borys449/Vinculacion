@@ -1,12 +1,38 @@
 const { Ganado, Usuario } = require('../models');
 const { Op } = require('sequelize');
 
-// @desc    Obtener todo el ganado
+// @desc    Obtener todo el ganado (Soporta filtros por búsqueda, estado y tipo)
 // @route   GET /api/ganado
 // @access  Private
 exports.obtenerGanado = async (req, res) => {
   try {
+    const { search, estado, tipo } = req.query;
+    let donde = {};
+
+    // 1. Barra de Búsqueda: Filtra por identificación o raza (insensible a mayúsculas/minúsculas)
+    if (search) {
+      donde[Op.or] = [
+        { identificacion: { [Op.iLike]: `%${search}%` } },
+        { raza: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
+    // 2. Filtro por Estado de Gestión (activo, vendido, fallecido, enfermo, etc.)
+    // Si no se envía un estado específico, por defecto trae los 'activo' para mantener la vista limpia,
+    // pero permite que convivan los estados 'vendido' o 'fallecido' si tu amigo los solicita desde el frontend.
+    if (estado) {
+      donde.estado = estado;
+    } else {
+      donde.estado = 'activo'; 
+    }
+
+    // 3. Filtro por Tipo de Animal (bovino, porcino, etc.)
+    if (tipo) {
+      donde.tipo = tipo;
+    }
+
     const ganado = await Ganado.findAll({
+      where: donde, // 🚀 CORREGIDO: Ahora sí aplica dinámicamente todo el objeto de filtros
       include: [{
         model: Usuario,
         as: 'responsable',
@@ -28,7 +54,7 @@ exports.obtenerGanado = async (req, res) => {
   }
 };
 
-// @desc    Obtener un animal
+// @desc    Obtener un animal por ID
 // @route   GET /api/ganado/:id
 // @access  Private
 exports.obtenerAnimal = async (req, res) => {
@@ -60,7 +86,7 @@ exports.obtenerAnimal = async (req, res) => {
   }
 };
 
-// @desc    Crear animal
+// @desc    Crear un nuevo animal
 // @route   POST /api/ganado
 // @access  Private
 exports.crearAnimal = async (req, res) => {
@@ -83,36 +109,9 @@ exports.crearAnimal = async (req, res) => {
   }
 };
 
-// @desc    Actualizar animal
+// @desc    Actualizar un animal (Une alertas clínicas automáticas y cambios de estado: vendido/fallecido)
 // @route   PUT /api/ganado/:id
 // @access  Private
-exports.actualizarAnimal = async (req, res) => {
-  try {
-    const animal = await Ganado.findByPk(req.params.id);
-
-    if (!animal) {
-      return res.status(404).json({
-        success: false,
-        message: 'Animal no encontrado'
-      });
-    }
-
-    await animal.update(req.body);
-    await animal.reload();
-
-    res.status(200).json({
-      success: true,
-      message: 'Animal actualizado exitosamente',
-      data: animal
-    });
-  } catch (error) {
-    res.status(400).json({
-      success: false,
-      message: error.message
-    });
-  }
-};
-
 exports.actualizarAnimal = async (req, res) => {
   try {
     const animal = await Ganado.findByPk(req.params.id);
@@ -123,12 +122,17 @@ exports.actualizarAnimal = async (req, res) => {
 
     let datosActualizar = { ...req.body };
 
-    // LÓGICA DE NEGOCIO: Automatización de alertas clínicas basadas en pesaje técnico
+    // 1. LÓGICA DE TU AMIGO: Si se envía un estado de salida técnico (vendido, fallecido), se asume en datosActualizar
+    if (req.body.estado) {
+      datosActualizar.estado = req.body.estado;
+    }
+
+    // 2. TU LÓGICA CLÍNICA: Automatización de alertas clínicas basadas en pesaje técnico
     if (req.body.pesoActual && animal.pesoInicial) {
       const pesoActualNum = parseFloat(req.body.pesoActual);
       const pesoInicialNum = parseFloat(animal.pesoInicial);
 
-      // Si el animal perdió más del 10% de su peso inicial, el backend toma acción clínica autónoma
+      // Si el animal perdió más del 10% de su peso inicial, acción clínica autónoma
       if (pesoActualNum < pesoInicialNum * 0.9) {
         datosActualizar.estadoSalud = 'enfermo';
         datosActualizar.observaciones = `[ALERTA AUTOMÁTICA DEL BACKEND]: El animal ha bajado drásticamente de peso. Estado de salud degradado automáticamente a enfermo para revisión veterinaria urgente. ` + (req.body.observaciones || '');
@@ -147,7 +151,8 @@ exports.actualizarAnimal = async (req, res) => {
     res.status(400).json({ success: false, message: error.message });
   }
 };
-// @desc    Eliminar animal
+
+// @desc    Eliminar un animal
 // @route   DELETE /api/ganado/:id
 // @access  Private
 exports.eliminarAnimal = async (req, res) => {
