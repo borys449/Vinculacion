@@ -1,12 +1,24 @@
 const { Cultivo, Usuario } = require('../models');
 const { Op } = require('sequelize');
 
-// @desc    Obtener todos los cultivos
+// @desc    Obtener todos los cultivos (Soporta filtros por búsqueda dinámica)
 // @route   GET /api/cultivos
 // @access  Private
 exports.obtenerCultivos = async (req, res) => {
   try {
+    const { search } = req.query;
+    let donde = {};
+
+    // Si el frontend envía texto en la barra de búsqueda, filtramos por nombre o ubicación
+    if (search) {
+      donde[Op.or] = [
+        { nombre: { [Op.iLike]: `%${search}%` } },
+        { ubicacion: { [Op.iLike]: `%${search}%` } }
+      ];
+    }
+
     const cultivos = await Cultivo.findAll({
+      where: donde, // 🚀 AHORA SÍ: Filtra dinámicamente en la base de datos
       include: [{
         model: Usuario,
         as: 'responsable',

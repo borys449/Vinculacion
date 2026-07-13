@@ -224,12 +224,16 @@ exports.validateGanado = [
     .isBoolean()
     .withMessage('Activo debe ser verdadero o falso'),
 
+  // En middleware/validation.js -> Reemplaza el bloque de 'estado' por este:
+
   body('estado')
     .optional()
     .isIn([
       'activo',
       'inactivo',
-      'en_cuarentena',
+      'vendido',
+      'gestacion',
+      'fallecido'
     ])
     .withMessage('Estado del animal inválido'),
 ];
