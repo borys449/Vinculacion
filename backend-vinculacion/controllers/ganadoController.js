@@ -17,14 +17,10 @@ exports.obtenerGanado = async (req, res) => {
       ];
     }
 
-    // 2. Filtro por Estado de Gestión (activo, vendido, fallecido, enfermo, etc.)
-    // Si no se envía un estado específico, por defecto trae los 'activo' para mantener la vista limpia,
-    // pero permite que convivan los estados 'vendido' o 'fallecido' si tu amigo los solicita desde el frontend.
-    if (estado) {
+    // 2. Filtro por Estado de Gestión (CORREGIDO: Ya no bloquea los datos en consultas generales)
+    if (estado && estado !== 'todos') {
       donde.estado = estado;
-    } else {
-      donde.estado = 'activo'; 
-    }
+    } 
 
     // 3. Filtro por Tipo de Animal (bovino, porcino, etc.)
     if (tipo) {
@@ -32,7 +28,7 @@ exports.obtenerGanado = async (req, res) => {
     }
 
     const ganado = await Ganado.findAll({
-      where: donde, // 🚀 CORREGIDO: Ahora sí aplica dinámicamente todo el objeto de filtros
+      where: donde, // Ahora sí aplica dinámicamente todo el objeto de filtros sin exclusiones fijas
       include: [{
         model: Usuario,
         as: 'responsable',
