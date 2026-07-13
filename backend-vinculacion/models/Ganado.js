@@ -85,12 +85,6 @@ const Ganado = sequelize.define('Ganado', {
   activo: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
-  },
-  // 🚀 AGREGAMOS LA NUEVA COLUMNA AL MODELO
-  estado: {
-    type: DataTypes.STRING(50),
-    allowNull: false,
-    defaultValue: 'activo'
   }
 }, {
   tableName: 'ganado',

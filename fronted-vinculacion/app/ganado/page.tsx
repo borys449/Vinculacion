@@ -39,23 +39,18 @@ export default function GanadoPage() {
       fechaNacimiento: '',
       sexo: 'macho',
       estadoSalud: 'bueno',
-      estado: 'activo', // 
+      estado: 'activo',
       pesoInicial: 0,
       pesoActual: 0,
       observaciones: '',
       activo: true,
-      estado: 'activo',
     },
   });
 
-  // 2. Modificado para enviar los filtros reactivos al backend
+  // 2. Modificado para obtener todo el ganado y permitir filtrado local reactivo
   const fetchGanado = async () => {
     try {
-      const response = await ganadoService.getAll({
-        search: search.trim(),
-        estado: estadoFilter,
-        tipo: tipoFilter,
-      });
+      const response = await ganadoService.getAll();
       if (response.success) {
         setGanado(response.data);
       }
@@ -66,10 +61,10 @@ export default function GanadoPage() {
     }
   };
 
-  // 3. El useEffect se dispara automáticamente cada vez que cambia un filtro
+  // 3. Se ejecuta al montar el componente
   useEffect(() => {
     fetchGanado();
-  }, [search, estadoFilter, tipoFilter]);
+  }, []);
 
   // Lógica de filtrado en tiempo real
   const filteredGanado = ganado.filter((animal) => {
@@ -131,7 +126,6 @@ export default function GanadoPage() {
       estado: animal.estado as any, 
       observaciones: animal.observaciones || '',
       activo: animal.activo,
-      estado: animal.estado as any,
     });
     setModalOpen(true);
   };
@@ -149,7 +143,6 @@ export default function GanadoPage() {
       pesoActual: 0,
       observaciones: '',
       activo: true,
-      estado: 'activo',
     });
     setModalOpen(true);
   };
@@ -169,7 +162,6 @@ export default function GanadoPage() {
       pesoActual: 0,
       observaciones: '',
       activo: true,
-      estado: 'activo',
     });
   };
 
@@ -200,23 +192,6 @@ export default function GanadoPage() {
       key: 'pesoActual',
       label: 'Peso (kg)',
       render: (value?: number) => (value ? `${value} kg` : 'N/A'),
-    },
-    {
-      key: 'estado',
-      label: 'Estado',
-      render: (value: string) => {
-        let badgeStyles = 'bg-gray-100 text-gray-800';
-        if (value === 'activo') badgeStyles = 'bg-green-100 text-green-800';
-        if (value === 'inactivo') badgeStyles = 'bg-orange-100 text-orange-800';
-        if (value === 'en_cuarentena') badgeStyles = 'bg-purple-100 text-purple-800';
-
-        const label = value === 'en_cuarentena' ? 'Cuarentena' : value.charAt(0).toUpperCase() + value.slice(1);
-        return (
-          <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeStyles}`}>
-            {label}
-          </span>
-        );
-      },
     },
     {
       key: 'estadoSalud',
@@ -312,9 +287,12 @@ export default function GanadoPage() {
                 className="bg-white border border-gray-300 rounded-lg text-sm text-gray-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all cursor-pointer"
               >
                 <option value="todos" className="text-gray-900">Todos los Estados</option>
-                <option value="activo" className="text-gray-900">Activos</option>
-                <option value="inactivo" className="text-gray-900">Inactivos</option>
-                <option value="en_cuarentena" className="text-gray-900">En Cuarentena</option>
+                <option value="activo" className="text-gray-900">Activo</option>
+                <option value="inactivo" className="text-gray-900">Inactivo</option>
+                <option value="vendido" className="text-gray-900">Vendido</option>
+                <option value="enfermo" className="text-gray-900">Enfermo</option>
+                <option value="gestacion" className="text-gray-900">Gestación</option>
+                <option value="fallecido" className="text-gray-900">Fallecido</option>
               </select>
             </div>
           </div>
@@ -405,9 +383,12 @@ export default function GanadoPage() {
                 error={errors.estado?.message}
                 options={[
                   { value: 'activo', label: 'Activo' },
-                  { value: 'inactivo', label: 'Inactivo (Vendido / De Baja)' },
-                  { value: 'en_cuarentena', label: 'En Cuarentena' },
-                ] as any}
+                  { value: 'inactivo', label: 'Inactivo' },
+                  { value: 'vendido', label: 'Vendido' },
+                  { value: 'enfermo', label: 'Enfermo' },
+                  { value: 'gestacion', label: 'Gestación' },
+                  { value: 'fallecido', label: 'Fallecido' },
+                ]}
                 {...register('estado')}
                 required
               />
