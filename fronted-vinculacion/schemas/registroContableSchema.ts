@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const registroContableSchema = z
   .object({
     tipo: z.enum(
-      ['cultivo', 'ganado', 'mantenimiento', 'produccion', 'venta', 'otro'],
+      ['cultivo', 'ganado', 'mantenimiento', 'produccion', 'venta', 'leche', 'otro'],
       { message: 'Tipo de registro no válido' }
     ),
     categoria: z.string().trim().min(2, 'La categoría es requerida'),
@@ -62,7 +62,7 @@ export const registroContableSchema = z
     path: ['cultivoId'],
   })
   .refine((data) => {
-    if (data.tipo === 'ganado') {
+    if (data.tipo === 'ganado' || data.tipo === 'leche') {
       return !!data.ganadoId && data.ganadoId > 0;
     }
     return true;

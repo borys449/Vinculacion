@@ -8,6 +8,7 @@ export interface Registro {
     | 'mantenimiento'
     | 'produccion'
     | 'venta'
+    | 'leche'
     | 'otro';
   categoria: string;
   descripcion: string;

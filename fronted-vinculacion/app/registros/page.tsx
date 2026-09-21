@@ -123,7 +123,7 @@ export default function RegistrosPage() {
       if (data.tipo === 'cultivo' && data.cultivoId) {
         cleanData.cultivoId = data.cultivoId;
       }
-      if (data.tipo === 'ganado' && data.ganadoId) {
+      if ((data.tipo === 'ganado' || data.tipo === 'leche') && data.ganadoId) {
         cleanData.ganadoId = data.ganadoId;
       }
 
@@ -346,6 +346,7 @@ export default function RegistrosPage() {
                 options={[
                   { value: 'cultivo', label: 'Cultivo' },
                   { value: 'ganado', label: 'Ganado' },
+                  { value: 'leche', label: 'Producción de Leche (Ordeño)' },
                   { value: 'mantenimiento', label: 'Mantenimiento' },
                   { value: 'produccion', label: 'Producción' },
                   { value: 'venta', label: 'Venta' },
@@ -384,13 +385,13 @@ export default function RegistrosPage() {
                 />
               )}
 
-              {watchTipo === 'ganado' && (
+              {(watchTipo === 'ganado' || watchTipo === 'leche') && (
                 <Select
-                  label="Ganado Relacionado"
+                  label={watchTipo === 'leche' ? 'Vaca / Bovino Ordeñado' : 'Ganado Relacionado'}
                   error={errors.ganadoId?.message}
                   options={filteredGanado.map((g) => ({
                     value: g.id,
-                    label: `${g.identificacion} (${g.raza})`,
+                    label: `${g.identificacion} (${g.raza || 'Sin raza'})`,
                   }))}
                   {...register('ganadoId', { valueAsNumber: true })}
                 />

@@ -25,10 +25,21 @@ const Ganado = sequelize.define('Ganado', {
   },
   raza: {
     type: DataTypes.STRING(255),
-    allowNull: false,
+    allowNull: true,
     validate: {
-      notEmpty: true,
       len: [1, 255]
+    }
+  },
+  proposito: {
+    type: DataTypes.ENUM('leche', 'carne', 'doble_proposito'),
+    allowNull: true
+  },
+  produccionEstimadaDiaria: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    defaultValue: 0.0,
+    validate: {
+      min: 0
     }
   },
   fechaNacimiento: {

@@ -188,8 +188,19 @@ exports.validateGanado = [
     .withMessage('Tipo de ganado inválido'),
 
   body('raza')
-    .notEmpty()
-    .withMessage('La raza es requerida'),
+    .optional({ checkFalsy: true })
+    .isLength({ max: 255 })
+    .withMessage('La raza no puede exceder los 255 caracteres'),
+
+  body('proposito')
+    .optional({ checkFalsy: true })
+    .isIn(['leche', 'carne', 'doble_proposito'])
+    .withMessage('Propósito inválido. Debe ser leche, carne o doble_proposito'),
+
+  body('produccionEstimadaDiaria')
+    .optional({ checkFalsy: true })
+    .isFloat({ min: 0 })
+    .withMessage('La producción estimada diaria debe ser un número positivo'),
 
   body('fechaNacimiento')
     .isISO8601()
@@ -249,6 +260,7 @@ exports.validateRegistro = [
       'mantenimiento',
       'produccion',
       'venta',
+      'leche',
       'otro',
     ])
     .withMessage('Tipo de registro inválido'),

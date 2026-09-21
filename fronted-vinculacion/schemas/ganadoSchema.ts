@@ -11,7 +11,20 @@ export const ganadoSchema = z.object({
   raza: z
     .string()
     .trim()
-    .min(2, 'La raza debe tener al menos 2 caracteres'),
+    .min(2, 'La raza debe tener al menos 2 caracteres')
+    .optional()
+    .or(z.literal('')),
+  proposito: z
+    .enum(['leche', 'carne', 'doble_proposito', ''], {
+      message: 'Propósito no válido',
+    })
+    .optional(),
+  produccionEstimadaDiaria: z
+    .number({ message: 'La producción estimada debe ser un número' })
+    .min(0, 'La producción estimada no puede ser negativa')
+    .optional()
+    .or(z.literal(0))
+    .or(z.nan()),
   fechaNacimiento: z
     .string()
     .min(1, 'La fecha de nacimiento es requerida')
@@ -29,13 +42,13 @@ export const ganadoSchema = z.object({
 
   pesoInicial: z
     .number({ message: 'El peso inicial debe ser un número' })
-    .positive('El peso inicial debe ser mayor a cero')
+    .min(0, 'El peso inicial no puede ser negativo')
     .optional()
     .or(z.literal(0))
     .or(z.nan()),
   pesoActual: z
     .number({ message: 'El peso actual debe ser un número' })
-    .positive('El peso actual debe ser mayor a cero')
+    .min(0, 'El peso actual no puede ser negativo')
     .optional()
     .or(z.literal(0))
     .or(z.nan()),

@@ -8,7 +8,7 @@ const Registro = sequelize.define('Registro', {
     autoIncrement: true
   },
   tipo: {
-    type: DataTypes.ENUM('cultivo', 'ganado', 'mantenimiento', 'produccion', 'venta', 'otro'),
+    type: DataTypes.ENUM('cultivo', 'ganado', 'mantenimiento', 'produccion', 'venta', 'leche', 'otro'),
     allowNull: false,
     validate: {
       notEmpty: true
