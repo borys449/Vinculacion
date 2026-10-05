@@ -2,3 +2,14 @@ ReporteBackend.md
 branch_structure.json
 temp_auto_push.bat
 temp_interactive_push.bat
+ReporteBackend.md
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+
+# Temporales de .NET y Aspire (para carpetas como aspire/)
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
