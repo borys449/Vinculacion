@@ -1,8 +1,6 @@
-import dotenv from 'dotenv';
-dotenv.config();
-
 'use strict';
-const bcrypt = require('bcrypt');
+require('dotenv').config();
+const bcrypt = require('bcryptjs'); // Usar bcryptjs tal como está resuelto en las dependencias
 
 /** @type {import('sequelize-cli').Migration} */
 module.exports = {
