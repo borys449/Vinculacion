@@ -4,8 +4,8 @@
   "description": "Backend para sistema de gestión agropecuaria Finca LODANA",
   "main": "server.js",
   "scripts": {
-    "start": "npx sequelize-cli db:migrate && node server.js",
-    "dev": "npx sequelize-cli db:migrate && nodemon server.js",
+    "start": "sequelize-cli db:migrate && node server.js",
+    "dev": "sequelize-cli db:migrate && nodemon server.js",
     "test": "jest --runInBand",
     "db:create": "node scripts/createDatabase.js"
   },
@@ -19,6 +19,7 @@
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/auto-instrumentations-node": "^0.78.0",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.220.0",
     "@opentelemetry/sdk-node": "^0.220.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.3",

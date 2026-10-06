@@ -1,7 +1,3 @@
-const { NodeSDK } = require('@opentelemetry/sdk-node');
-const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
-const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-proto');
-
 let telemetryStarted = false;
 let sdk = null;
 
@@ -16,6 +12,9 @@ const initializeTelemetry = async () => {
   process.env.OTEL_SERVICE_NAME = process.env.OTEL_SERVICE_NAME || 'finca-lodana-backend';
 
   try {
+    const { NodeSDK } = require('@opentelemetry/sdk-node');
+    const { getNodeAutoInstrumentations } = require('@opentelemetry/auto-instrumentations-node');
+    const { OTLPTraceExporter } = require('@opentelemetry/exporter-trace-otlp-proto');
     // Configure the OTLP/HTTP protobuf trace exporter.
     // If OTEL_EXPORTER_OTLP_ENDPOINT is defined in the environment (e.g. by .NET Aspire),
     // the OTLPTraceExporter automatically uses it. Otherwise, we fall back to localhost.
