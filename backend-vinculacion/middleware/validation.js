@@ -5,7 +5,6 @@ exports.validate = (req, res, next) => {
   const errors = validationResult(req);
 
   if (!errors.isEmpty()) {
-<<<<<<< HEAD
     const errArray = errors.array();
     // Log en servidor para diagnóstico rápido
     console.error('[Validation Error]', JSON.stringify(errArray, null, 2));
@@ -13,12 +12,6 @@ exports.validate = (req, res, next) => {
       success: false,
       message: errArray.map((e) => e.msg).join(' | '),
       errors: errArray,
-=======
-    return res.status(400).json({
-      success: false,
-      message: 'Errores de validación',
-      errors: errors.array(),
->>>>>>> a358133f144632c0139a41238584ef31cf0270f7
     });
   }
 
@@ -180,7 +173,8 @@ exports.validateCultivo = [
 // ===============================
 // GANADO
 // ===============================
-<<<<<<< HEAD
+
+// Validador exclusivo para CREAR (identificacion requerida)
 exports.validateGanadoCreate = [
   body('identificacion')
     .notEmpty()
@@ -189,22 +183,16 @@ exports.validateGanadoCreate = [
     .withMessage('La identificación no puede exceder los 255 caracteres'),
 ];
 
+// Validador exclusivo para ACTUALIZAR (identificacion opcional)
 exports.validateGanadoUpdate = [
-=======
-exports.validateGanado = [
->>>>>>> a358133f144632c0139a41238584ef31cf0270f7
   body('identificacion')
     .optional({ checkFalsy: true })
     .isLength({ max: 255 })
     .withMessage('La identificación no puede exceder los 255 caracteres'),
-<<<<<<< HEAD
 ];
 
 // Campos comunes a crear y actualizar
 const validateGanadoCommon = [
-=======
->>>>>>> a358133f144632c0139a41238584ef31cf0270f7
-
   body('tipo')
     .isIn([
       'bovino',
@@ -240,20 +228,12 @@ const validateGanadoCommon = [
     .withMessage('Sexo inválido'),
 
   body('pesoInicial')
-<<<<<<< HEAD
     .optional({ nullable: true })
-=======
-    .optional()
->>>>>>> a358133f144632c0139a41238584ef31cf0270f7
     .isFloat({ min: 0 })
     .withMessage('Peso inicial inválido'),
 
   body('pesoActual')
-<<<<<<< HEAD
     .optional({ nullable: true })
-=======
-    .optional()
->>>>>>> a358133f144632c0139a41238584ef31cf0270f7
     .isFloat({ min: 0 })
     .withMessage('Peso actual inválido'),
 
@@ -272,28 +252,19 @@ const validateGanadoCommon = [
     .isBoolean()
     .withMessage('Activo debe ser verdadero o falso'),
 
-<<<<<<< HEAD
-=======
-  // En middleware/validation.js -> Reemplaza el bloque de 'estado' por este:
-
->>>>>>> a358133f144632c0139a41238584ef31cf0270f7
   body('estado')
     .optional()
     .isIn([
       'activo',
       'inactivo',
       'vendido',
-<<<<<<< HEAD
       'enfermo',
-=======
->>>>>>> a358133f144632c0139a41238584ef31cf0270f7
       'gestacion',
-      'fallecido'
+      'fallecido',
     ])
     .withMessage('Estado del animal inválido'),
 ];
 
-<<<<<<< HEAD
 // Ensamblar listas completas para exportar
 exports.validateGanadoCreate = [
   ...exports.validateGanadoCreate,
@@ -305,11 +276,9 @@ exports.validateGanadoUpdate = [
   ...validateGanadoCommon,
 ];
 
-// Alias retrocompatible (usado en otras partes del código)
+// Alias retrocompatible (por si otro módulo lo importa como validateGanado)
 exports.validateGanado = exports.validateGanadoCreate;
 
-=======
->>>>>>> a358133f144632c0139a41238584ef31cf0270f7
 // ===============================
 // REGISTROS
 // ===============================
