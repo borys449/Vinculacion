@@ -27,7 +27,11 @@ const Ganado = sequelize.define('Ganado', {
     type: DataTypes.STRING(255),
     allowNull: true,
     validate: {
+<<<<<<< HEAD
       len: [0, 255]
+=======
+      len: [1, 255]
+>>>>>>> a358133f144632c0139a41238584ef31cf0270f7
     }
   },
   proposito: {
