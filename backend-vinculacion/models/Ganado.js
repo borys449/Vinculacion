@@ -1,0 +1,107 @@
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/database');
+
+const Ganado = sequelize.define('Ganado', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
+  identificacion: {
+    type: DataTypes.STRING(255),
+    allowNull: false,
+    unique: true,
+    validate: {
+      notEmpty: true,
+      len: [1, 255]
+    }
+  },
+  tipo: {
+    type: DataTypes.ENUM('bovino', 'porcino', 'ovino', 'caprino', 'avicola', 'otro'),
+    allowNull: false,
+    validate: {
+      notEmpty: true
+    }
+  },
+  raza: {
+    type: DataTypes.STRING(255),
+    allowNull: true,
+    validate: {
+      len: [0, 255]
+    }
+  },
+  proposito: {
+    type: DataTypes.ENUM('leche', 'carne', 'doble_proposito'),
+    allowNull: true
+  },
+  produccionEstimadaDiaria: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    defaultValue: 0.0,
+    validate: {
+      min: 0
+    }
+  },
+  fechaNacimiento: {
+    type: DataTypes.DATEONLY,
+    allowNull: false,
+    validate: {
+      notEmpty: true
+    }
+  },
+  sexo: {
+    type: DataTypes.ENUM('macho', 'hembra'),
+    allowNull: false,
+    validate: {
+      notEmpty: true
+    }
+  },
+  pesoInicial: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    validate: {
+      min: 0
+    }
+  },
+  pesoActual: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    validate: {
+      min: 0
+    }
+  },
+  estadoSalud: {
+    type: DataTypes.ENUM('excelente', 'bueno', 'regular', 'enfermo'),
+    defaultValue: 'bueno'
+  },
+  estado: {
+    type: DataTypes.ENUM('activo', 'inactivo', 'vendido', 'enfermo', 'gestacion', 'fallecido'),
+    defaultValue: 'activo',
+    allowNull: false
+  },
+  observaciones: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  responsableId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'usuarios',
+      key: 'id'
+    },
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE'
+  },
+  activo: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  }
+}, {
+  tableName: 'ganado',
+  timestamps: true,
+  createdAt: 'fechaRegistro',
+  updatedAt: false
+});
+
+module.exports = Ganado;

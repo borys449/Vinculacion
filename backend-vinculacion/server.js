@@ -1,0 +1,123 @@
+require('./otel');
+
+const express = require('express');
+const dotenv = require('dotenv');
+const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const cookieParser = require('cookie-parser'); 
+const { connectDB } = require('./config/database');
+const { assertJwtSecretConfigured } = require('./config/jwt');
+
+const morgan = require('morgan');
+const { errorHandler } = require('./middleware/errorMiddleware');
+
+// Cargar variables de entorno
+dotenv.config({ override: true });
+
+// Inicializar la aplicación Express
+const app = express(); 
+
+// Configuración de middlewares globales
+app.use(cookieParser()); 
+app.use(helmet());
+
+// Logging en desarrollo
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+}
+
+// Configuración de CORS con origen específico
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+  credentials: true,
+  optionsSuccessStatus: 200,
+};
+app.use(cors(corsOptions));
+
+// Rate Limiting - Limitar peticiones por IP
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 100, // límite de 100 peticiones por ventana
+  message: 'Demasiadas peticiones desde esta IP, por favor intente más tarde',
+});
+app.use('/api/', limiter);
+
+// Rate Limiting específico para login (más restrictivo)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 5, // máximo 5 intentos de login
+  message: 'Demasiados intentos de login, por favor intente más tarde',
+});
+app.use('/api/auth/login', loginLimiter);
+
+// Middleware para parsear JSON con límite de tamaño
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Cargar modelos para establecer relaciones
+const db = require('./models');
+
+// Routes
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/usuarios', require('./routes/usuarios'));
+app.use('/api/cultivos', require('./routes/cultivos'));
+app.use('/api/ganado', require('./routes/ganado'));
+app.use('/api/registros', require('./routes/registros'));
+
+// Ruta de prueba
+app.get('/', (req, res) => {
+  res.json({
+    message: 'API Finca LODANA - Sistema de Gestión Agropecuaria',
+    version: '2.0.0',
+    database: 'PostgreSQL',
+  });
+});
+
+// Manejo de errores
+app.use(errorHandler);
+
+const PORT = process.env.PORT || 3000;
+
+// Levantar el servidor solo si no estamos en entorno de pruebas y si es el archivo principal
+if (process.env.NODE_ENV !== 'test') {
+  if (require.main === module) {
+    assertJwtSecretConfigured();
+    connectDB();
+
+    app.listen(PORT, async () => {
+      console.log(`Servidor corriendo en puerto ${PORT}`);
+      console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
+
+      // 🚀 VERIFICACIÓN E INYECCIÓN AUTOMÁTICA DE LA COLUMNA "estado"
+      try {
+        const sequelizeInstance = db.sequelize;
+        if (sequelizeInstance) {
+          const queryInterface = sequelizeInstance.getQueryInterface();
+          
+          // Revisamos la estructura actual de la tabla 'ganado' en Postgres
+          const tableDefinition = await queryInterface.describeTable('ganado');
+          
+          // Si la columna 'estado' no existe localmente, se crea sola sin que nadie use comandos
+          if (!tableDefinition.estado) {
+            await queryInterface.addColumn('ganado', 'estado', {
+              type: sequelizeInstance.Sequelize.STRING(50),
+              allowNull: false,
+              defaultValue: 'activo'
+            });
+            console.log('--- Migración automática exitosa: Columna "estado" añadida a la tabla ganado ---');
+          }
+        }
+      } catch (error) {
+        // Captura cualquier inconveniente con credenciales locales (.env) del equipo 
+        // evitando que el backend sufra un crash o apagado repentino.
+        console.log('\n======================================================');
+        console.log('Aviso de BD Local: No se pudo verificar la columna "estado".');
+        console.log('Razón:', error.message);
+        console.log('======================================================\n');
+      }
+    });
+  }
+} 
+
+module.exports = app;

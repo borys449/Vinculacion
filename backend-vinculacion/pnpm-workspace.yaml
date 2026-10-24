@@ -1,0 +1,4 @@
+allowBuilds:
+  bcrypt: false
+  protobufjs: false
+  unrs-resolver: false
