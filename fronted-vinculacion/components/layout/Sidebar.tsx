@@ -14,18 +14,29 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
   const { user } = useAuth();
+
   const isAdmin = user?.tipo === 'administrador';
+  const isCultivos = user?.area === 'cultivos';
+  const isGanaderia = user?.area === 'ganaderia';
 
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: FiHome },
-    { name: 'Cultivos', href: '/cultivos', icon: GiCorn },
-    { name: 'Ganado', href: '/ganado', icon: GiCow },
-    { name: 'Registros', href: '/registros', icon: FiFileText },
-    ...(isAdmin
-      ? [{ name: 'Usuarios', href: '/usuarios', icon: FiUsers }]
-      : []),
-    { name: 'Configuración', href: '/settings', icon: FiSettings },
-  ];
+    { name: 'Dashboard', href: '/dashboard', icon: FiHome, show: true },
+    {
+      name: 'Cultivos',
+      href: '/cultivos',
+      icon: GiCorn,
+      show: isAdmin || isCultivos,
+    },
+    {
+      name: 'Ganado',
+      href: '/ganado',
+      icon: GiCow,
+      show: isAdmin || isGanaderia,
+    },
+    { name: 'Registros', href: '/registros', icon: FiFileText, show: true },
+    { name: 'Usuarios', href: '/usuarios', icon: FiUsers, show: isAdmin },
+    { name: 'Configuración', href: '/settings', icon: FiSettings, show: true },
+  ].filter((item) => item.show);
 
   return (
     <>
@@ -112,7 +123,7 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
               <div className="shrink-0">
                 <div className="h-10 w-10 rounded-full bg-green-100 flex items-center justify-center">
                   <span className="text-green-600 font-semibold text-sm">
-                    {user?.nombre.charAt(0).toUpperCase()}
+                    {user?.nombre?.charAt(0).toUpperCase()}
                   </span>
                 </div>
               </div>

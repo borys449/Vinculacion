@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -22,7 +24,6 @@ import {
   RAZAS_POR_PROPOSITO,
   TODAS_LAS_RAZAS_BOVINAS,
   validarPesoEdadBovino,
-  calcularEdadMeses,
   PropositoBovino,
 } from '@/constants/bovinos';
 import {
@@ -42,6 +43,26 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
 export default function GanadoPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  // Redirección de seguridad según rol y área
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      const isAdmin = user.tipo === 'administrador';
+      const isGanaderia = user.area === 'ganaderia';
+
+      if (!isAdmin && !isGanaderia) {
+        router.push('/dashboard');
+      }
+    }
+  }, [user, authLoading, router]);
+
   // Pestañas principales
   const [activeTab, setActiveTab] = useState<'inventario' | 'leche'>('inventario');
 
@@ -172,9 +193,11 @@ export default function GanadoPage() {
   };
 
   useEffect(() => {
-    fetchGanado();
-    fetchControlLechero();
-  }, []);
+    if (!authLoading && user && (user.tipo === 'administrador' || user.area === 'ganaderia')) {
+      fetchGanado();
+      fetchControlLechero();
+    }
+  }, [authLoading, user]);
 
   useEffect(() => {
     if (selectedBovinoId) {
@@ -502,6 +525,15 @@ export default function GanadoPage() {
       ),
     },
   ];
+
+  // Pantalla de carga mientras valida permisos
+  if (authLoading || (!user || (user.tipo !== 'administrador' && user.area !== 'ganaderia'))) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
 
   return (
     <ProtectedRoute>

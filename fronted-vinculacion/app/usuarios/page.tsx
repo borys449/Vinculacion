@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import Card from '@/components/ui/Card';
@@ -15,6 +17,23 @@ import { FiEdit, FiTrash2, FiKey } from 'react-icons/fi';
 import { format } from 'date-fns';
 
 export default function UsuariosPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  // Redirección de seguridad: Exclusivo para administradores
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      if (user.tipo !== 'administrador') {
+        router.push('/dashboard');
+      }
+    }
+  }, [user, authLoading, router]);
+
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -30,10 +49,6 @@ export default function UsuariosPage() {
   });
   const [newPassword, setNewPassword] = useState('');
 
-  useEffect(() => {
-    fetchUsuarios();
-  }, []);
-
   async function fetchUsuarios() {
     try {
       const response = await usuarioService.getAll();
@@ -46,6 +61,12 @@ export default function UsuariosPage() {
       setLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!authLoading && user && user.tipo === 'administrador') {
+      fetchUsuarios();
+    }
+  }, [authLoading, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,7 +147,7 @@ export default function UsuariosPage() {
     {
       key: 'area',
       label: 'Área',
-      render: (value: string) => value.charAt(0).toUpperCase() + value.slice(1),
+      render: (value: string) => value ? value.charAt(0).toUpperCase() + value.slice(1) : '-',
     },
     {
       key: 'tipo',
@@ -139,7 +160,7 @@ export default function UsuariosPage() {
               : 'bg-blue-100 text-blue-800'
           }`}
         >
-          {value.charAt(0).toUpperCase() + value.slice(1)}
+          {value ? value.charAt(0).toUpperCase() + value.slice(1) : 'Trabajador'}
         </span>
       ),
     },
@@ -159,7 +180,7 @@ export default function UsuariosPage() {
     {
       key: 'fechaRegistro',
       label: 'Registro',
-      render: (value: string) => format(new Date(value), 'dd/MM/yyyy'),
+      render: (value: string) => value ? format(new Date(value), 'dd/MM/yyyy') : 'N/A',
     },
     {
       key: 'acciones',
@@ -191,6 +212,15 @@ export default function UsuariosPage() {
       ),
     },
   ];
+
+  // Pantalla de carga mientras valida permisos de administrador
+  if (authLoading || (!user || user.tipo !== 'administrador')) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
 
   return (
     <ProtectedRoute requireAdmin>
@@ -263,9 +293,7 @@ export default function UsuariosPage() {
                 options={[
                   { value: 'cultivos', label: 'Cultivos' },
                   { value: 'ganaderia', label: 'Ganadería' },
-                  { value: 'mantenimiento', label: 'Mantenimiento' },
                   { value: 'administracion', label: 'Administración' },
-                  { value: 'investigacion', label: 'Investigación' },
                 ]}
                 required
               />

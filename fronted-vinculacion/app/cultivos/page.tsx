@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -20,6 +22,26 @@ import { FiPlus, FiEdit, FiTrash2, FiSearch } from 'react-icons/fi';
 import { format } from 'date-fns';
 
 export default function CultivosPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  // Redirección de seguridad según rol y área para cultivos
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      const isAdmin = user.tipo === 'administrador';
+      const isCultivos = user.area === 'cultivos';
+
+      if (!isAdmin && !isCultivos) {
+        router.push('/dashboard');
+      }
+    }
+  }, [user, authLoading, router]);
+
   const [cultivos, setCultivos] = useState<Cultivo[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
@@ -61,12 +83,14 @@ export default function CultivosPage() {
   };
 
   useEffect(() => {
-    const delayDebounceFn = setTimeout(() => {
-      fetchCultivos();
-    }, 300);
+    if (!authLoading && user && (user.tipo === 'administrador' || user.area === 'cultivos')) {
+      const delayDebounceFn = setTimeout(() => {
+        fetchCultivos();
+      }, 300);
 
-    return () => clearTimeout(delayDebounceFn);
-  }, [search]);
+      return () => clearTimeout(delayDebounceFn);
+    }
+  }, [search, authLoading, user]);
 
   const onSubmit = async (data: CultivoSchemaType) => {
     try {
@@ -192,6 +216,15 @@ export default function CultivosPage() {
       ),
     },
   ];
+
+  // Pantalla de carga mientras valida permisos
+  if (authLoading || (!user || (user.tipo !== 'administrador' && user.area !== 'cultivos'))) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
 
   return (
     <ProtectedRoute>

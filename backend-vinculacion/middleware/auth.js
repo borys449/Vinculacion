@@ -44,7 +44,7 @@ exports.protect = async (req, res, next) => {
   }
 };
 
-// Middleware para verificar rol de administrador
+// Middleware para verificar rol de administrador 
 exports.autorizar = (...roles) => {
   return (req, res, next) => {
     if (!roles.includes(req.usuario.tipo)) {
@@ -54,5 +54,32 @@ exports.autorizar = (...roles) => {
       });
     }
     next();
+  };
+};
+
+//Middleware para restringir el acceso según el área de trabajo
+exports.autorizarArea = (...areasPermitidas) => {
+  return (req, res, next) => {
+    if (!req.usuario) {
+      return res.status(401).json({
+        success: false,
+        message: 'No autorizado, sesión no encontrada'
+      });
+    }
+
+    // El administrador siempre tiene acceso libre
+    if (req.usuario.tipo === 'administrador' || req.usuario.area === 'administracion') {
+      return next();
+    }
+
+    // Verificar si el área asignada al usuario tiene permiso
+    if (areasPermitidas.includes(req.usuario.area)) {
+      return next();
+    }
+
+    return res.status(403).json({
+      success: false,
+      message: `Tu área de trabajo (${req.usuario.area}) no tiene acceso a este módulo.`
+    });
   };
 };

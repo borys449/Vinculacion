@@ -5,10 +5,13 @@ exports.validate = (req, res, next) => {
   const errors = validationResult(req);
 
   if (!errors.isEmpty()) {
+    const errArray = errors.array();
+    // Log en servidor para diagnóstico rápido
+    console.error('[Validation Error]', JSON.stringify(errArray, null, 2));
     return res.status(400).json({
       success: false,
-      message: 'Errores de validación',
-      errors: errors.array(),
+      message: errArray.map((e) => e.msg).join(' | '),
+      errors: errArray,
     });
   }
 
@@ -40,6 +43,14 @@ exports.validateUsuario = [
     .isLength({ min: 3, max: 255 })
     .withMessage('El nombre debe tener al menos 3 caracteres'),
 
+  body('area')
+    .isIn(['cultivos', 'ganaderia', 'administracion'])
+    .withMessage('Área inválida. Debe ser cultivos, ganaderia o administracion'),
+
+  body('tipo')
+    .isIn(['trabajador', 'administrador'])
+    .withMessage('Tipo de usuario inválido'),
+
   body('cedula')
     .notEmpty()
     .withMessage('La cédula es requerida')
@@ -53,7 +64,7 @@ exports.validateUsuario = [
   body('telefono')
     .notEmpty()
     .withMessage('El teléfono es requerido')
-    .matches(/^[0-9]{10}$/)
+    .matches(/'^[0-9]{10}$/)
     .withMessage('Teléfono inválido'),
 
   body('area')
@@ -170,12 +181,26 @@ exports.validateCultivo = [
 // ===============================
 // GANADO
 // ===============================
-exports.validateGanado = [
+
+// Validador exclusivo para CREAR (identificacion requerida)
+exports.validateGanadoCreate = [
+  body('identificacion')
+    .notEmpty()
+    .withMessage('La identificación del animal es requerida')
+    .isLength({ max: 255 })
+    .withMessage('La identificación no puede exceder los 255 caracteres'),
+];
+
+// Validador exclusivo para ACTUALIZAR (identificacion opcional)
+exports.validateGanadoUpdate = [
   body('identificacion')
     .optional({ checkFalsy: true })
     .isLength({ max: 255 })
     .withMessage('La identificación no puede exceder los 255 caracteres'),
+];
 
+// Campos comunes a crear y actualizar
+const validateGanadoCommon = [
   body('tipo')
     .isIn([
       'bovino',
@@ -211,21 +236,20 @@ exports.validateGanado = [
     .withMessage('Sexo inválido'),
 
   body('pesoInicial')
-    .optional()
+    .optional({ nullable: true })
     .isFloat({ min: 0 })
     .withMessage('Peso inicial inválido'),
 
   body('pesoActual')
-    .optional()
+    .optional({ nullable: true })
     .isFloat({ min: 0 })
     .withMessage('Peso actual inválido'),
 
   body('estadoSalud')
     .optional()
     .isIn([
-      'excelente',
-      'bueno',
-      'regular',
+      'sano',
+      'en recuperacion',
       'enfermo',
     ])
     .withMessage('Estado de salud inválido'),
@@ -235,19 +259,32 @@ exports.validateGanado = [
     .isBoolean()
     .withMessage('Activo debe ser verdadero o falso'),
 
-  // En middleware/validation.js -> Reemplaza el bloque de 'estado' por este:
-
   body('estado')
     .optional()
     .isIn([
       'activo',
       'inactivo',
       'vendido',
+      'enfermo',
       'gestacion',
-      'fallecido'
+      'fallecido',
     ])
     .withMessage('Estado del animal inválido'),
 ];
+
+// Ensamblar listas completas para exportar
+exports.validateGanadoCreate = [
+  ...exports.validateGanadoCreate,
+  ...validateGanadoCommon,
+];
+
+exports.validateGanadoUpdate = [
+  ...exports.validateGanadoUpdate,
+  ...validateGanadoCommon,
+];
+
+// Alias retrocompatible (por si otro módulo lo importa como validateGanado)
+exports.validateGanado = exports.validateGanadoCreate;
 
 // ===============================
 // REGISTROS

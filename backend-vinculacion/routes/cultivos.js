@@ -13,8 +13,8 @@ const {
   actualizarCultivo,
   eliminarCultivo,
 } = require('../controllers/cultivoController');
-
 router.use(protect);
+router.use(autorizarArea('cultivos'));
 
 router
   .route('/')

@@ -16,7 +16,7 @@ const {
 } = require('../controllers/registroController');
 
 router.use(protect);
-
+router.use(autorizarArea('cultivos', 'ganaderia'));
 router.get('/resumen-financiero', obtenerResumenFinanciero);
 
 router

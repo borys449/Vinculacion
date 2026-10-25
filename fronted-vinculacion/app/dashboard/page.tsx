@@ -23,11 +23,15 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
 
+  const isAdmin = user?.tipo === 'administrador';
+  const isCultivos = user?.area === 'cultivos';
+  const isGanaderia = user?.area === 'ganaderia';
+
   const fetchDashboardData = async () => {
     try {
       const [cultivosRes, ganadoRes, registrosRes, resumenRes] = await Promise.all([
-        cultivoService.getAll(),
-        ganadoService.getAll(),
+        isAdmin || isCultivos ? cultivoService.getAll() : Promise.resolve({ count: 0 }),
+        isAdmin || isGanaderia ? ganadoService.getAll() : Promise.resolve({ count: 0 }),
         registroService.getAll(),
         registroService.getResumenFinanciero(),
       ]);
@@ -36,9 +40,9 @@ export default function DashboardPage() {
       const totalCostos = resumenRes.success ? resumenRes.data.costos : 0;
 
       setStats({
-        cultivos: cultivosRes.count || 0,
-        ganado: ganadoRes.count || 0,
-        registros: registrosRes.count || 0,
+        cultivos: cultivosRes.count || (cultivosRes.data ? cultivosRes.data.length : 0),
+        ganado: ganadoRes.count || (ganadoRes.data ? ganadoRes.data.length : 0),
+        registros: registrosRes.count || (registrosRes.data ? registrosRes.data.length : 0),
         ingresos: totalIngresos,
         costos: totalCostos,
       });
@@ -50,8 +54,10 @@ export default function DashboardPage() {
   };
 
   useEffect(() => {
-    fetchDashboardData();
-  }, []);
+    if (user) {
+      fetchDashboardData();
+    }
+  }, [user]);
 
   const balance = stats.ingresos - stats.costos;
 
@@ -64,7 +70,7 @@ export default function DashboardPage() {
               Bienvenido, {user?.nombre}
             </h1>
             <p className="text-gray-600 mt-2">
-              Panel de control - Sistema de Gestión Agropecuaria
+              Panel de control - Sistema de Gestión Agropecuaria ({user?.area ? user.area.charAt(0).toUpperCase() + user.area.slice(1) : 'General'})
             </p>
           </div>
 
@@ -74,20 +80,24 @@ export default function DashboardPage() {
             </div>
           ) : (
             <>
-              {/* Estadísticas principales */}
+              {/* Estadísticas principales filtradas por rol/área */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                <StatCard
-                  title="Total Cultivos"
-                  value={stats.cultivos}
-                  icon={<GiCorn className="h-6 w-6" />}
-                  color="green"
-                />
-                <StatCard
-                  title="Total Ganado"
-                  value={stats.ganado}
-                  icon={<GiCow className="h-6 w-6" />}
-                  color="blue"
-                />
+                {(isAdmin || isCultivos) && (
+                  <StatCard
+                    title="Total Cultivos"
+                    value={stats.cultivos}
+                    icon={<GiCorn className="h-6 w-6" />}
+                    color="green"
+                  />
+                )}
+                {(isAdmin || isGanaderia) && (
+                  <StatCard
+                    title="Total Ganado"
+                    value={stats.ganado}
+                    icon={<GiCow className="h-6 w-6" />}
+                    color="blue"
+                  />
+                )}
                 <StatCard
                   title="Registros"
                   value={stats.registros}
@@ -102,7 +112,7 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Resumen financiero */}
+              {/* Resumen financiero y accesos rápidos */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="bg-white rounded-lg shadow-sm border p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -127,8 +137,7 @@ export default function DashboardPage() {
                           Balance Neto
                         </span>
                         <span
-                          className={`text-xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'
-                            }`}
+                          className={`text-xl font-bold ${balance >= 0 ? 'text-green-600' : 'text-red-600'}`}
                         >
                           ${balance.toFixed(2)}
                         </span>
@@ -142,24 +151,28 @@ export default function DashboardPage() {
                     Accesos Rápidos
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
-                    <Link
-                      href="/cultivos"
-                      className="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
-                    >
-                      <GiCorn className="h-8 w-8 text-green-600 mb-2" />
-                      <span className="text-sm font-medium text-gray-700">
-                        Cultivos
-                      </span>
-                    </Link>
-                    <Link
-                      href="/ganado"
-                      className="flex flex-col items-center justify-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                    >
-                      <GiCow className="h-8 w-8 text-blue-600 mb-2" />
-                      <span className="text-sm font-medium text-gray-700">
-                        Ganado
-                      </span>
-                    </Link>
+                    {(isAdmin || isCultivos) && (
+                      <Link
+                        href="/cultivos"
+                        className="flex flex-col items-center justify-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition-colors"
+                      >
+                        <GiCorn className="h-8 w-8 text-green-600 mb-2" />
+                        <span className="text-sm font-medium text-gray-700">
+                          Cultivos
+                        </span>
+                      </Link>
+                    )}
+                    {(isAdmin || isGanaderia) && (
+                      <Link
+                        href="/ganado"
+                        className="flex flex-col items-center justify-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                      >
+                        <GiCow className="h-8 w-8 text-blue-600 mb-2" />
+                        <span className="text-sm font-medium text-gray-700">
+                          Ganado
+                        </span>
+                      </Link>
+                    )}
                     <Link
                       href="/registros"
                       className="flex flex-col items-center justify-center p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
@@ -170,7 +183,7 @@ export default function DashboardPage() {
                       </span>
                     </Link>
                     <Link
-                      href="/registros" // Puedes cambiarlo a /reportes si creas esa ruta en el futuro
+                      href="/registros"
                       className="flex flex-col items-center justify-center p-4 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition-colors"
                     >
                       <FiTrendingUp className="h-8 w-8 text-yellow-600 mb-2" />

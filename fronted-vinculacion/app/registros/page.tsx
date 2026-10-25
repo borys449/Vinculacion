@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -22,6 +24,27 @@ import { FiPlus, FiEdit, FiTrash2, FiDollarSign } from 'react-icons/fi';
 import { format } from 'date-fns';
 
 export default function RegistrosPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  // Redirección de seguridad: Permitido para Administradores, Cultivos y Ganadería
+  useEffect(() => {
+    if (!authLoading) {
+      if (!user) {
+        router.push('/login');
+        return;
+      }
+
+      const isAdmin = user.tipo === 'administrador';
+      const isCultivos = user.area === 'cultivos';
+      const isGanaderia = user.area === 'ganaderia';
+
+      if (!isAdmin && !isCultivos && !isGanaderia) {
+        router.push('/dashboard');
+      }
+    }
+  }, [user, authLoading, router]);
+
   const [registros, setRegistros] = useState<Registro[]>([]);
   const [cultivos, setCultivos] = useState<any[]>([]);
   const [ganado, setGanado] = useState<any[]>([]);
@@ -70,10 +93,6 @@ export default function RegistrosPage() {
     }
   }, [watchTipo, setValue, editingRegistro]);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       const [registrosRes, cultivosRes, ganadoRes, resumenRes] = await Promise.all([
@@ -97,6 +116,18 @@ export default function RegistrosPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      const isAdmin = user.tipo === 'administrador';
+      const isCultivos = user.area === 'cultivos';
+      const isGanaderia = user.area === 'ganaderia';
+
+      if (isAdmin || isCultivos || isGanaderia) {
+        fetchData();
+      }
+    }
+  }, [authLoading, user]);
 
   const onSubmit = async (data: RegistroContableSchemaType) => {
     try {
@@ -187,10 +218,7 @@ export default function RegistrosPage() {
     });
   };
 
-  // Mostrar todos los cultivos (evita que se filtren por la categoría del registro, ej: fertilizantes, vacuna)
   const filteredCultivos = cultivos;
-
-  // Mostrar todo el ganado (evita que se filtren por la categoría del registro, ej: fertilizantes, vacuna)
   const filteredGanado = ganado;
 
   const columns = [
@@ -245,6 +273,19 @@ export default function RegistrosPage() {
       ),
     },
   ];
+
+  // Pantalla de carga mientras valida permisos
+  if (
+    authLoading ||
+    !user ||
+    (user.tipo !== 'administrador' && user.area !== 'cultivos' && user.area !== 'ganaderia')
+  ) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600"></div>
+      </div>
+    );
+  }
 
   return (
     <ProtectedRoute>
