@@ -95,10 +95,8 @@ if (process.env.NODE_ENV !== 'test') {
         if (sequelizeInstance) {
           const queryInterface = sequelizeInstance.getQueryInterface();
           
-          // Revisamos la estructura actual de la tabla 'ganado' en Postgres
           const tableDefinition = await queryInterface.describeTable('ganado');
           
-          // Si la columna 'estado' no existe localmente, se crea sola sin que nadie use comandos
           if (!tableDefinition.estado) {
             await queryInterface.addColumn('ganado', 'estado', {
               type: sequelizeInstance.Sequelize.STRING(50),
@@ -109,12 +107,66 @@ if (process.env.NODE_ENV !== 'test') {
           }
         }
       } catch (error) {
-        // Captura cualquier inconveniente con credenciales locales (.env) del equipo 
-        // evitando que el backend sufra un crash o apagado repentino.
         console.log('\n======================================================');
         console.log('Aviso de BD Local: No se pudo verificar la columna "estado".');
         console.log('Razón:', error.message);
         console.log('======================================================\n');
+      }
+
+      // 🚀 INSERCIÓN AUTOMÁTICA DE USUARIOS DE PRUEBA DESDE EL .ENV
+      try {
+        const bcrypt = require('bcrypt');
+        const usuariosPrueba = [
+          {
+            nombre: process.env.ADMIN_NOMBRE,
+            cedula: process.env.ADMIN_CEDULA,
+            email: process.env.ADMIN_EMAIL,
+            telefono: process.env.ADMIN_TELEFONO,
+            area: 'administracion',
+            tipo: 'administrador',
+            passwordPlana: process.env.ADMIN_PASSWORD
+          },
+          {
+            nombre: process.env.CULTIVOS_NOMBRE,
+            cedula: process.env.CULTIVOS_CEDULA,
+            email: process.env.CULTIVOS_EMAIL,
+            telefono: process.env.CULTIVOS_TELEFONO,
+            area: 'cultivos',
+            tipo: 'trabajador',
+            passwordPlana: process.env.CULTIVOS_PASSWORD
+          },
+          {
+            nombre: process.env.GANADERIA_NOMBRE,
+            cedula: process.env.GANADERIA_CEDULA,
+            email: process.env.GANADERIA_EMAIL,
+            telefono: process.env.GANADERIA_TELEFONO,
+            area: 'ganaderia',
+            tipo: 'trabajador',
+            passwordPlana: process.env.GANADERIA_PASSWORD
+          }
+        ];
+
+        for (const u of usuariosPrueba) {
+          if (u.email && u.passwordPlana) {
+            const existe = await db.Usuario.findOne({ where: { email: u.email } });
+            if (!existe) {
+              const hashedPassword = await bcrypt.hash(u.passwordPlana, 10);
+              await db.Usuario.create({
+                nombre: u.nombre || 'Usuario Test',
+                cedula: u.cedula || '0000000000',
+                email: u.email,
+                telefono: u.telefono || '0000000000',
+                area: u.area,
+                tipo: u.tipo,
+                password: hashedPassword,
+                activo: true
+              });
+              console.log(`--- Usuario de prueba creado automáticamente: ${u.nombre} (${u.email}) ---`);
+            }
+          }
+        }
+      } catch (seedError) {
+        console.log('Aviso: No se pudieron crear los usuarios de prueba automáticamente:', seedError.message);
       }
     });
   }

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
+const { protect, autorizarArea } = require('../middleware/auth');
 const {
   validateGanadoCreate,
   validateGanadoUpdate,
@@ -19,10 +19,8 @@ const {
 } = require('../controllers/ganadoController');
 
 router.use(protect);
-// Restringir módulo de ganado únicamente a personal de 'ganaderia' (y administradores)
 router.use(autorizarArea('ganaderia'));
 
-// Rutas globales de control lechero (deben ir antes de /:id)
 router.get('/control-lechero/resumen', obtenerResumenControlLechero);
 
 router
@@ -30,7 +28,6 @@ router
   .get(obtenerGanado)
   .post(validateGanadoCreate, validate, crearAnimal);
 
-// Rutas individuales de control lechero y registro de ordeño
 router.get('/:id/control-lechero', validateId, validate, obtenerControlLechero);
 router.post('/:id/ordenio', validateId, validate, registrarOrdenio);
 

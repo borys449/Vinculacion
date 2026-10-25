@@ -61,10 +61,10 @@ export default function RegistroPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-linear-to-br from-green-600 to-emerald-600 rounded-2xl shadow-lg mb-4">
             <GiCorn className="h-10 w-10 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-bold text-black mb-2">
             Registro de Usuario
           </h1>
-          <p className="text-gray-600">
+          <p className="text-black">
             Completa el formulario para crear tu cuenta
           </p>
         </div>
@@ -120,10 +120,8 @@ export default function RegistroPage() {
                 label="Área de Trabajo"
                 options={[
                   { value: 'cultivos', label: 'Cultivos' },
-                  { value: 'ganaderia', label: 'Ganadería' },
-                  { value: 'mantenimiento', label: 'Mantenimiento' },
+                  { value: 'ganaderia', label: 'Ganadería' },                  
                   { value: 'administracion', label: 'Administración' },
-                  { value: 'investigacion', label: 'Investigación' },
                 ]}
                 error={errors.area?.message}
                 {...register('area')}
@@ -169,7 +167,7 @@ export default function RegistroPage() {
           </form>
 
           <div className="mt-6 text-center">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-black-600">
               ¿Ya tienes una cuenta?{' '}
               <Link
                 href="/login"

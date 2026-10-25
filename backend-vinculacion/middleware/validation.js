@@ -1,5 +1,40 @@
 const { body, param, validationResult } = require('express-validator');
 
+// Función helper para validar cédula ecuatoriana (Módulo 10) - 100% Offline
+const validarCedulaEcuatoriana = (cedula) => {
+  if (typeof cedula !== 'string') return false;
+  
+  // Debe tener exactamente 10 dígitos numéricos
+  if (!/^\d{10}$/.test(cedula)) return false;
+
+  const provincia = parseInt(cedula.substring(0, 2), 10);
+  // Provincias válidas en Ecuador: 1 a 24, o 30 para ecuatorianos en el exterior
+  if ((provincia < 1 || provincia > 24) && provincia !== 30) {
+    return false;
+  }
+
+  const tercerDigito = parseInt(cedula.charAt(2), 10);
+  // El tercer dígito para cédulas de personas naturales debe ser menor a 6
+  if (tercerDigito >= 6) {
+    return false;
+  }
+
+  const coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2];
+  const digitoVerificador = parseInt(cedula.charAt(9), 10);
+  let suma = 0;
+
+  for (let i = 0; i < 9; i++) {
+    let valor = parseInt(cedula.charAt(i), 10) * coeficientes[i];
+    if (valor >= 10) {
+      valor -= 9;
+    }
+    suma += valor;
+  }
+
+  const totalObtenido = suma % 10 === 0 ? 0 : 10 - (suma % 10);
+  return totalObtenido === digitoVerificador;
+};
+
 // Middleware para validar los resultados
 exports.validate = (req, res, next) => {
   const errors = validationResult(req);
@@ -43,19 +78,15 @@ exports.validateUsuario = [
     .isLength({ min: 3, max: 255 })
     .withMessage('El nombre debe tener al menos 3 caracteres'),
 
-  body('area')
-    .isIn(['cultivos', 'ganaderia', 'administracion'])
-    .withMessage('Área inválida. Debe ser cultivos, ganaderia o administracion'),
-
-  body('tipo')
-    .isIn(['trabajador', 'administrador'])
-    .withMessage('Tipo de usuario inválido'),
-
   body('cedula')
     .notEmpty()
     .withMessage('La cédula es requerida')
-    .isLength({ min: 10, max: 13 })
-    .withMessage('Cédula inválida'),
+    .custom((value) => {
+      if (!validarCedulaEcuatoriana(value)) {
+        throw new Error('La cédula ecuatoriana ingresada no es válida');
+      }
+      return true;
+    }),
 
   body('email')
     .isEmail()
@@ -64,8 +95,8 @@ exports.validateUsuario = [
   body('telefono')
     .notEmpty()
     .withMessage('El teléfono es requerido')
-    .matches(/'^[0-9]{10}$/)
-    .withMessage('Teléfono inválido'),
+    .matches(/^[0-9]{10}$/)
+    .withMessage('Teléfono inválido, debe contener 10 dígitos'),
 
   body('area')
     .isIn([
@@ -283,7 +314,7 @@ exports.validateGanadoUpdate = [
   ...validateGanadoCommon,
 ];
 
-// Alias retrocompatible (por si otro módulo lo importa como validateGanado)
+// Alias retrocompatible
 exports.validateGanado = exports.validateGanadoCreate;
 
 // ===============================

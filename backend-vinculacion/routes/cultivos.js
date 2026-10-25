@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect } = require('../middleware/auth');
+const { protect, autorizarArea } = require('../middleware/auth');
 const {
   validateCultivo,
   validateId,
@@ -13,6 +13,7 @@ const {
   actualizarCultivo,
   eliminarCultivo,
 } = require('../controllers/cultivoController');
+
 router.use(protect);
 router.use(autorizarArea('cultivos'));
 
