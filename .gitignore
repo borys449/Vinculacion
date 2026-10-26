@@ -13,3 +13,5 @@ temp_interactive_push.bat
 .vs/
 *.user
 *.suo
+config.bat
+node_modules

@@ -45,18 +45,24 @@ export type RegistroFormData = Omit<
 >;
 
 export const registroService = {
-  getAll: async () => {
-    const response = await api.get('/registros');
+  getAll: async (area?: string) => {
+    const response = await api.get('/registros', {
+      params: area ? { area } : {},
+    });
     return response.data;
   },
 
-  getResumenFinanciero: async () => {
-    const response = await api.get('/registros/resumen-financiero');
+  getResumenFinanciero: async (area?: string) => {
+    const response = await api.get('/registros/resumen-financiero', {
+      params: area ? { area } : {},
+    });
     return response.data;
   },
 
-  getDashboardStats: async () => {
-    const response = await api.get('/registros/dashboard-stats');
+  getDashboardStats: async (area?: string) => {
+    const response = await api.get('/registros/dashboard-stats', {
+      params: area ? { area } : {},
+    });
     return response.data;
   },
 

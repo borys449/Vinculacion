@@ -1,33 +1,95 @@
 const { Registro, Usuario, Cultivo, Ganado } = require('../models');
 const { Op } = require('sequelize');
 
-// @desc    Obtener todos los registros (Bitácora) filtrados estrictamente por las relaciones de área
+// Función auxiliar para construir el filtro estricto por área
+const construirFiltroArea = (usuario, areaParam, soloFinancierosUOperativos = true) => {
+  let baseFiltro = {};
+
+  if (!usuario) {
+    if (areaParam === 'cultivos' || areaParam === 'ganaderia') {
+      baseFiltro = obtenerReglasPorArea(areaParam);
+    }
+  } else {
+    let areaTarget = null;
+    if (usuario.tipo !== 'administrador') {
+      areaTarget = usuario.area;
+    } else if (areaParam && areaParam !== 'global' && areaParam !== 'todos') {
+      areaTarget = areaParam;
+    }
+
+    if (areaTarget === 'cultivos' || areaTarget === 'ganaderia') {
+      baseFiltro = obtenerReglasPorArea(areaTarget);
+    }
+  }
+
+  // Filtrado estricto para excluir eventos de auditoría y actualizaciones automáticas
+  if (soloFinancierosUOperativos) {
+    return {
+      [Op.and]: [
+        baseFiltro,
+        {
+          categoria: {
+            [Op.notIn]: ['Actualización', 'Creación de Animal', 'Creación de Cultivo']
+          }
+        },
+        {
+          descripcion: {
+            [Op.notLike]: '%Actualizó:%'
+          }
+        }
+      ]
+    };
+  }
+
+  return baseFiltro;
+};
+
+const obtenerReglasPorArea = (area) => {
+  if (area === 'cultivos') {
+    return {
+      [Op.and]: [
+        { ganadoId: null },
+        { tipo: { [Op.notIn]: ['ganado', 'leche'] } },
+        {
+          [Op.or]: [
+            { cultivoId: { [Op.not]: null } },
+            { tipo: 'cultivo' }
+          ]
+        }
+      ]
+    };
+  }
+
+  if (area === 'ganaderia') {
+    return {
+      [Op.and]: [
+        { cultivoId: null },
+        { tipo: { [Op.ne]: 'cultivo' } },
+        {
+          [Op.or]: [
+            { ganadoId: { [Op.not]: null } },
+            { tipo: { [Op.in]: ['ganado', 'leche'] } }
+          ]
+        }
+      ]
+    };
+  }
+
+  return {};
+};
+
+// @desc    Obtener todos los registros (Registros financieros limpios)
 // @route   GET /api/registros
 // @access  Private
 exports.obtenerRegistros = async (req, res) => {
   try {
-    let donde = {};
-
-    // 🚀 Aislamiento estricto por ID de relación (Cultivo vs Ganado)
-    if (req.usuario.tipo !== 'administrador') {
-      if (req.usuario.area === 'cultivos') {
-        donde = {
-          [Op.and]: [
-            { cultivoId: { [Op.not]: null } },
-            { ganadoId: null }
-          ]
-        };
-      } else if (req.usuario.area === 'ganaderia') {
-        donde = {
-          ganadoId: { [Op.not]: null }
-        };
-      }
-    }
+    const soloOperativos = req.query.operativos !== 'false';
+    const donde = construirFiltroArea(req.usuario, req.query.area, soloOperativos);
 
     const registros = await Registro.findAll({
       where: donde,
       include: [
-        { model: Usuario, as: 'registradoPor', attributes: ['id', 'nombre', 'tipo', 'area'] },
+        { model: Usuario, as: 'registradoPor', attributes: ['id', 'nombre', 'tipo', 'area'], required: false },
         { model: Cultivo, as: 'cultivo', attributes: ['id', 'nombre'] },
         { model: Ganado, as: 'ganado', attributes: ['id', 'identificacion'] }
       ],
@@ -67,18 +129,33 @@ exports.obtenerRegistro = async (req, res) => {
   }
 };
 
-// @desc    Crear un nuevo registro
+// @desc    Crear un nuevo registro garantizando respuesta exitosa
 // @route   POST /api/registros
 // @access  Private
 exports.crearRegistro = async (req, res) => {
   try {
-    const nuevoRegistro = await Registro.create({
+    let datosCreacion = {
       ...req.body,
       registradoPorId: req.usuario.id
-    });
+    };
+
+    if (req.usuario && req.usuario.tipo !== 'administrador') {
+      if (req.usuario.area === 'cultivos') {
+        datosCreacion.ganadoId = null;
+      } else if (req.usuario.area === 'ganaderia') {
+        datosCreacion.cultivoId = null;
+      }
+    }
+
+    if (!datosCreacion.costo) datosCreacion.costo = 0;
+    if (!datosCreacion.ingresos) datosCreacion.ingresos = 0;
+    if (!datosCreacion.cantidad) datosCreacion.cantidad = 0;
+
+    const nuevoRegistro = await Registro.create(datosCreacion);
 
     res.status(201).json({ success: true, data: nuevoRegistro });
   } catch (error) {
+    console.error('Error al crear registro:', error);
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -119,74 +196,53 @@ exports.eliminarRegistro = async (req, res) => {
   }
 };
 
-// @desc    Obtener resumen financiero filtrado por relaciones de área
+// @desc    Obtener resumen financiero
 // @route   GET /api/registros/resumen-financiero
 // @access  Private
 exports.obtenerResumenFinanciero = async (req, res) => {
   try {
-    let donde = {};
+    const donde = construirFiltroArea(req?.usuario, req?.query?.area, true);
 
-    if (req.usuario.tipo !== 'administrador') {
-      if (req.usuario.area === 'cultivos') {
-        donde = {
-          [Op.and]: [
-            { cultivoId: { [Op.not]: null } },
-            { ganadoId: null }
-          ]
-        };
-      } else if (req.usuario.area === 'ganaderia') {
-        donde = {
-          ganadoId: { [Op.not]: null }
-        };
-      }
-    }
-
-    const registros = await Registro.findAll({ where: donde });
     let ingresos = 0;
     let costos = 0;
+
+    const registros = await Registro.findAll({
+      where: donde,
+      attributes: ['ingresos', 'costo']
+    });
 
     registros.forEach(r => {
       ingresos += Number(r.ingresos || 0);
       costos += Number(r.costo || 0);
     });
 
+    const balance = Number((ingresos - costos).toFixed(2));
+
     res.status(200).json({
       success: true,
-      data: { ingresos, costos }
+      data: {
+        ingresos,
+        costos,
+        balance
+      }
     });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Obtener datos agregados para el Dashboard (Actividad reciente y gráfica) aislados por relaciones
+// @desc    Obtener datos agregados para el Dashboard
 // @route   GET /api/registros/dashboard-stats
 // @access  Private
 exports.obtenerDatosDashboard = async (req, res) => {
   try {
-    let donde = {};
+    const donde = construirFiltroArea(req?.usuario, req?.query?.area, false);
+    const dondeFinanciero = construirFiltroArea(req?.usuario, req?.query?.area, true);
 
-    // 🚀 Aislamiento estricto por IDs asociados en la base de datos
-    if (req.usuario.tipo !== 'administrador') {
-      if (req.usuario.area === 'cultivos') {
-        donde = {
-          [Op.and]: [
-            { cultivoId: { [Op.not]: null } },
-            { ganadoId: null }
-          ]
-        };
-      } else if (req.usuario.area === 'ganaderia') {
-        donde = {
-          ganadoId: { [Op.not]: null }
-        };
-      }
-    }
-
-    // 1. Actividad reciente filtrada por las relaciones correctas
     const actividadReciente = await Registro.findAll({
       where: donde,
       include: [
-        { model: Usuario, as: 'registradoPor', attributes: ['id', 'nombre', 'tipo', 'area'] },
+        { model: Usuario, as: 'registradoPor', attributes: ['id', 'nombre', 'tipo', 'area'], required: false },
         { model: Cultivo, as: 'cultivo', attributes: ['id', 'nombre'] },
         { model: Ganado, as: 'ganado', attributes: ['id', 'identificacion'] }
       ],
@@ -194,32 +250,37 @@ exports.obtenerDatosDashboard = async (req, res) => {
       limit: 5
     });
 
-    // 2. Tendencias financieras históricas (últimos 6 meses)
     const fechaActual = new Date();
+    const anioActual = fechaActual.getFullYear();
+    const mesActual = fechaActual.getMonth();
+
+    const inicioPeriodo = new Date(anioActual, mesActual - 5, 1, 0, 0, 0, 0);
+    const finPeriodo = new Date(anioActual, mesActual + 1, 0, 23, 59, 59, 999);
+
+    const registrosHistoricos = await Registro.findAll({
+      where: {
+        ...dondeFinanciero,
+        fecha: { [Op.between]: [inicioPeriodo, finPeriodo] }
+      }
+    });
+
     const datosGraficoTendencias = [];
 
     for (let i = 5; i >= 0; i--) {
-      const d = new Date(fechaActual.getFullYear(), fechaActual.getMonth() - i, 1);
+      const d = new Date(anioActual, mesActual - i, 1);
       const anio = d.getFullYear();
       const mes = d.getMonth();
       const nombreMes = d.toLocaleString('es-ES', { month: 'short', year: '2-digit' });
 
-      const inicioMes = new Date(anio, mes, 1, 0, 0, 0, 0);
-      const finMes = new Date(anio, mes + 1, 0, 23, 59, 59, 999);
-
-      const registrosMes = await Registro.findAll({
-        where: {
-          ...donde,
-          fecha: { [Op.between]: [inicioMes, finMes] }
-        }
-      });
-
       let ingresosMes = 0;
       let costosMes = 0;
 
-      registrosMes.forEach(reg => {
-        ingresosMes += Number(reg.ingresos || 0);
-        costosMes += Number(reg.costo || 0);
+      registrosHistoricos.forEach(reg => {
+        const f = new Date(reg.fecha);
+        if (f.getFullYear() === anio && f.getMonth() === mes) {
+          ingresosMes += Number(reg.ingresos || 0);
+          costosMes += Number(reg.costo || 0);
+        }
       });
 
       datosGraficoTendencias.push({
@@ -231,7 +292,10 @@ exports.obtenerDatosDashboard = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: { actividadReciente, datosGraficoTendencias }
+      data: {
+        actividadReciente,
+        datosGraficoTendencias
+      }
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
