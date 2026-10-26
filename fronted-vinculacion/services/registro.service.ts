@@ -55,6 +55,11 @@ export const registroService = {
     return response.data;
   },
 
+  getDashboardStats: async () => {
+    const response = await api.get('/registros/dashboard-stats');
+    return response.data;
+  },
+
   getById: async (id: number) => {
     const response = await api.get(`/registros/${id}`);
     return response.data;

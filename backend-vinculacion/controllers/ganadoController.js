@@ -6,22 +6,17 @@ const {
   calcularEdadEnMeses,
 } = require('../utils/ganaderiaUtils');
 
-// Helper para obtener rango de fechas del mes actual
 const getRangoMesActual = (referencia = new Date()) => {
   const inicioMes = new Date(referencia.getFullYear(), referencia.getMonth(), 1, 0, 0, 0, 0);
   const finMes = new Date(referencia.getFullYear(), referencia.getMonth() + 1, 0, 23, 59, 59, 999);
   return { inicioMes, finMes };
 };
 
-// @desc    Obtener todo el ganado (Soporta filtros por búsqueda, estado, tipo y propósito)
-// @route   GET /api/ganado
-// @access  Private
 exports.obtenerGanado = async (req, res) => {
   try {
     const { search, estado, tipo, proposito } = req.query;
     let donde = {};
 
-    // 1. Barra de Búsqueda: Filtra por identificación o raza
     if (search) {
       donde[Op.or] = [
         { identificacion: { [Op.iLike]: `%${search}%` } },
@@ -29,17 +24,14 @@ exports.obtenerGanado = async (req, res) => {
       ];
     }
 
-    // 2. Filtro por Estado de Gestión
     if (estado && estado !== 'todos') {
       donde.estado = estado;
     }
 
-    // 3. Filtro por Tipo de Animal (bovino, porcino, etc.)
     if (tipo) {
       donde.tipo = tipo;
     }
 
-    // 4. Filtro por Propósito (leche, carne, doble_proposito)
     if (proposito) {
       donde.proposito = proposito;
     }
@@ -67,9 +59,6 @@ exports.obtenerGanado = async (req, res) => {
   }
 };
 
-// @desc    Obtener un animal por ID con evaluación biológica y métricas de producción lechera
-// @route   GET /api/ganado/:id
-// @access  Private
 exports.obtenerAnimal = async (req, res) => {
   try {
     const animal = await Ganado.findByPk(req.params.id, {
@@ -87,7 +76,6 @@ exports.obtenerAnimal = async (req, res) => {
       });
     }
 
-    // Evaluación biológica
     const pesoEval = animal.pesoActual || animal.pesoInicial;
     const evaluacionBiologica = validarRangosBiologicos({
       tipo: animal.tipo,
@@ -95,7 +83,6 @@ exports.obtenerAnimal = async (req, res) => {
       peso: pesoEval
     });
 
-    // Estadísticas de producción lechera del mes
     const { inicioMes, finMes } = getRangoMesActual();
     const registrosMes = await Registro.findAll({
       where: {
@@ -126,15 +113,11 @@ exports.obtenerAnimal = async (req, res) => {
   }
 };
 
-// @desc    Crear un nuevo animal con validaciones biológicas
-// @route   POST /api/ganado
-// @access  Private
 exports.crearAnimal = async (req, res) => {
   try {
     const { tipo, fechaNacimiento, pesoInicial, pesoActual } = req.body;
     const pesoParaValidar = pesoActual !== undefined && pesoActual !== null ? pesoActual : pesoInicial;
 
-    // Validación biológica de edad vs peso
     const evalBiologica = validarRangosBiologicos({
       tipo,
       fechaNacimiento,
@@ -153,6 +136,15 @@ exports.crearAnimal = async (req, res) => {
       responsableId: req.usuario.id
     });
 
+    await Registro.create({
+      tipo: 'ganado',
+      categoria: 'Creación de Animal',
+      descripcion: `Se registró el animal ${animal.identificacion} (${animal.tipo} - ${animal.raza})`,
+      fecha: new Date(),
+      ganadoId: animal.id,
+      registradoPorId: req.usuario.id
+    });
+
     res.status(201).json({
       success: true,
       message: 'Animal registrado exitosamente',
@@ -167,9 +159,6 @@ exports.crearAnimal = async (req, res) => {
   }
 };
 
-// @desc    Actualizar un animal con alertas biológicas y clínicas
-// @route   PUT /api/ganado/:id
-// @access  Private
 exports.actualizarAnimal = async (req, res) => {
   try {
     const animal = await Ganado.findByPk(req.params.id);
@@ -178,25 +167,55 @@ exports.actualizarAnimal = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Animal no encontrado' });
     }
 
+    // 🚀 Normalizar estado de salud al formato exacto del ENUM de la base de datos ('en_recuperacion')
+    if (req.body.estadoSalud) {
+      const saludMapeo = {
+        'sano': 'sano',
+        'enfermo': 'enfermo',
+        'en recuperacion': 'en_recuperacion',
+        'en recuperación': 'en_recuperacion',
+        'en_recuperacion': 'en_recuperacion',
+        'critico': 'enfermo',
+        'crítico': 'enfermo'
+      };
+      const normalizado = req.body.estadoSalud.toLowerCase().trim();
+      req.body.estadoSalud = saludMapeo[normalizado] || 'sano';
+    }
+
+    // Detección dinámica general de cambios en animales
+    let cambiosRealizados = [];
+    const camposPermitidos = [
+      'identificacion', 'tipo', 'raza', 'genero', 'fechaNacimiento', 
+      'pesoInicial', 'pesoActual', 'proposito', 'estado', 'estadoSalud', 'observaciones'
+    ];
+
+    camposPermitidos.forEach(campo => {
+      if (req.body[campo] !== undefined && req.body[campo] !== null) {
+        const valorAntiguo = animal[campo] !== null ? String(animal[campo]) : '';
+        const valorNuevo = String(req.body[campo]);
+
+        if (valorAntiguo !== valorNuevo) {
+          cambiosRealizados.push(`${campo}: '${valorNuevo}'`);
+        }
+      }
+    });
+
     let datosActualizar = { ...req.body };
 
-    // 1. Estado de salida técnico (vendido, fallecido, etc.)
     if (req.body.estado) {
       datosActualizar.estado = req.body.estado;
     }
 
-    // 2. Alertas clínicas automáticas basadas en caída de peso
     if (req.body.pesoActual && animal.pesoInicial) {
       const pesoActualNum = parseFloat(req.body.pesoActual);
       const pesoInicialNum = parseFloat(animal.pesoInicial);
 
       if (pesoActualNum < pesoInicialNum * 0.9) {
         datosActualizar.estadoSalud = 'enfermo';
-        datosActualizar.observaciones = `[ALERTA AUTOMÁTICA DEL BACKEND]: El animal ha bajado drásticamente de peso. Estado de salud degradado automáticamente a enfermo para revisión veterinaria urgente. ` + (req.body.observaciones || '');
+        datosActualizar.observaciones = `[ALERTA AUTOMÁTICA DEL BACKEND]: El animal ha bajado drásticamente de peso. Estado de salud degradado a enfermo. ` + (req.body.observaciones || '');
       }
     }
 
-    // 3. Validación biológica de edad vs peso
     const tipoAnimal = req.body.tipo || animal.tipo;
     const fechaNacimiento = req.body.fechaNacimiento || animal.fechaNacimiento;
     const pesoParaValidar = req.body.pesoActual !== undefined ? req.body.pesoActual : (req.body.pesoInicial !== undefined ? req.body.pesoInicial : animal.pesoActual);
@@ -217,9 +236,22 @@ exports.actualizarAnimal = async (req, res) => {
     await animal.update(datosActualizar);
     await animal.reload();
 
+    const detalleCambio = cambiosRealizados.length > 0 
+      ? `Actualizó: ${cambiosRealizados.join(', ')}` 
+      : 'Se actualizó información general del animal';
+
+    await Registro.create({
+      tipo: 'ganado',
+      categoria: 'Actualización',
+      descripcion: `Animal ${animal.identificacion}: ${detalleCambio}`,
+      fecha: new Date(),
+      ganadoId: animal.id,
+      registradoPorId: req.usuario.id
+    });
+
     res.status(200).json({
       success: true,
-      message: 'Datos del animal actualizados y evaluados por el sistema de control biológico',
+      message: 'Datos del animal actualizados exitosamente',
       advertenciasBiologicas: evalBiologica.advertencias,
       data: animal
     });
@@ -228,9 +260,6 @@ exports.actualizarAnimal = async (req, res) => {
   }
 };
 
-// @desc    Eliminar un animal
-// @route   DELETE /api/ganado/:id
-// @access  Private
 exports.eliminarAnimal = async (req, res) => {
   try {
     const animal = await Ganado.findByPk(req.params.id);
@@ -242,7 +271,16 @@ exports.eliminarAnimal = async (req, res) => {
       });
     }
 
+    const ident = animal.identificacion;
     await animal.destroy();
+
+    await Registro.create({
+      tipo: 'ganado',
+      categoria: 'Eliminación',
+      descripcion: `Se eliminó el registro del animal ${ident}`,
+      fecha: new Date(),
+      registradoPorId: req.usuario.id
+    });
 
     res.status(200).json({
       success: true,
@@ -257,9 +295,6 @@ exports.eliminarAnimal = async (req, res) => {
   }
 };
 
-// @desc    Obtener control lechero detallado de un animal específico (Estimada vs. Real)
-// @route   GET /api/ganado/:id/control-lechero
-// @access  Private
 exports.obtenerControlLechero = async (req, res) => {
   try {
     const animal = await Ganado.findByPk(req.params.id, {
@@ -279,7 +314,6 @@ exports.obtenerControlLechero = async (req, res) => {
 
     const { inicioMes, finMes } = getRangoMesActual();
 
-    // Obtener registros de leche del animal en el mes
     const registrosMes = await Registro.findAll({
       where: {
         ganadoId: animal.id,
@@ -308,14 +342,10 @@ exports.obtenerControlLechero = async (req, res) => {
   }
 };
 
-// @desc    Obtener resumen global de control lechero para todo el hato
-// @route   GET /api/ganado/control-lechero/resumen
-// @access  Private
 exports.obtenerResumenControlLechero = async (req, res) => {
   try {
     const { inicioMes, finMes } = getRangoMesActual();
 
-    // Obtener todos los bovinos activos (o que tengan propósito lechero / doble propósito)
     const bovinos = await Ganado.findAll({
       where: {
         tipo: 'bovino',
@@ -324,7 +354,6 @@ exports.obtenerResumenControlLechero = async (req, res) => {
       order: [['identificacion', 'ASC']]
     });
 
-    // Obtener todos los registros de leche del mes
     const registrosLecheMes = await Registro.findAll({
       where: {
         tipo: 'leche',
@@ -340,7 +369,6 @@ exports.obtenerResumenControlLechero = async (req, res) => {
       order: [['fecha', 'DESC']]
     });
 
-    // Agrupar registros por animal
     const registrosPorAnimal = {};
     for (const reg of registrosLecheMes) {
       if (reg.ganadoId) {
@@ -389,9 +417,6 @@ exports.obtenerResumenControlLechero = async (req, res) => {
   }
 };
 
-// @desc    Registrar ordeño diario para un animal específico (Guarda en la tabla registros)
-// @route   POST /api/ganado/:id/ordenio
-// @access  Private
 exports.registrarOrdenio = async (req, res) => {
   try {
     const animal = await Ganado.findByPk(req.params.id);
@@ -419,7 +444,7 @@ exports.registrarOrdenio = async (req, res) => {
     const nuevoRegistro = await Registro.create({
       tipo: 'leche',
       categoria: 'Ordeño Diario',
-      descripcion: `Ordeño diario registrado para ${animal.identificacion}${turnoTexto}`,
+      descripcion: `Ordeño diario registrado para ${animal.identificacion}${turnoTexto}: ${litros} litros`,
       fecha: fechaRegistro,
       cantidad: litros,
       unidad: 'litros',
@@ -428,7 +453,6 @@ exports.registrarOrdenio = async (req, res) => {
       registradoPorId: req.usuario.id
     });
 
-    // Re-calcular estadísticas en tiempo real
     const { inicioMes, finMes } = getRangoMesActual(fechaRegistro);
     const registrosMes = await Registro.findAll({
       where: {

@@ -108,7 +108,7 @@ export default function GanadoPage() {
       produccionEstimadaDiaria: 0,
       fechaNacimiento: '',
       sexo: 'hembra',
-      estadoSalud: 'bueno',
+      estadoSalud: 'sano',
       estado: 'activo',
       pesoInicial: 0,
       pesoActual: 0,
@@ -315,7 +315,7 @@ export default function GanadoPage() {
       produccionEstimadaDiaria: 0,
       fechaNacimiento: '',
       sexo: 'hembra',
-      estadoSalud: 'bueno',
+      estadoSalud: 'sano',
       estado: 'activo',
       pesoInicial: 0,
       pesoActual: 0,
@@ -455,14 +455,19 @@ export default function GanadoPage() {
       label: 'Salud',
       render: (value: string) => {
         let badgeStyles = 'bg-gray-100 text-gray-800';
-        if (value === 'excelente') badgeStyles = 'bg-green-100 text-green-800';
-        if (value === 'bueno') badgeStyles = 'bg-blue-100 text-blue-800';
-        if (value === 'regular') badgeStyles = 'bg-yellow-100 text-yellow-800';
+        if (value === 'sano') badgeStyles = 'bg-green-100 text-green-800';
+        if (value === 'en_recuperacion') badgeStyles = 'bg-yellow-100 text-yellow-800';
         if (value === 'enfermo') badgeStyles = 'bg-red-100 text-red-800';
+
+        const labels: Record<string, string> = {
+          sano: 'Sano',
+          en_recuperacion: 'En recuperación',
+          enfermo: 'Enfermo',
+        };
 
         return (
           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badgeStyles}`}>
-            {value.charAt(0).toUpperCase() + value.slice(1)}
+            {labels[value] || value}
           </span>
         );
       },
@@ -983,7 +988,6 @@ export default function GanadoPage() {
                       {...register('proposito')}
                       onChange={(e) => {
                         setValue('proposito', e.target.value as any);
-                        // Sugerir la primera raza correspondiente al nuevo propósito
                         const razas = RAZAS_POR_PROPOSITO[e.target.value as PropositoBovino];
                         if (razas && razas.length > 0) {
                           setValue('raza', razas[0]);
@@ -1050,9 +1054,8 @@ export default function GanadoPage() {
                   label="Estado de Salud"
                   error={errors.estadoSalud?.message}
                   options={[
-                    { value: 'excelente', label: 'Excelente' },
-                    { value: 'bueno', label: 'Bueno' },
-                    { value: 'regular', label: 'Regular' },
+                    { value: 'sano', label: 'Sano' },
+                    { value: 'en_recuperacion', label: 'En recuperación' },
                     { value: 'enfermo', label: 'Enfermo' },
                   ]}
                   {...register('estadoSalud')}

@@ -32,9 +32,8 @@ export const ganadoSchema = z.object({
   sexo: z.enum(['macho', 'hembra'], {
     message: 'Sexo no válido',
   }),
-  estadoSalud: z.enum(['excelente', 'bueno', 'regular', 'enfermo'], {
-    message: 'Estado de salud no válido',
-  }),
+  // En tu archivo ganadoSchema.ts
+estadoSalud: z.enum(['sano', 'en_recuperacion', 'enfermo']),
   
   estado: z.enum(['activo', 'inactivo', 'vendido', 'enfermo', 'gestacion', 'fallecido'], {
     message: 'Estado de gestión no válido',

@@ -1,15 +1,11 @@
-const { Cultivo, Usuario } = require('../models');
+const { Cultivo, Usuario, Registro } = require('../models');
 const { Op } = require('sequelize');
 
-// @desc    Obtener todos los cultivos (Soporta filtros por búsqueda dinámica)
-// @route   GET /api/cultivos
-// @access  Private
 exports.obtenerCultivos = async (req, res) => {
   try {
     const { search } = req.query;
     let donde = {};
 
-    // Si el frontend envía texto en la barra de búsqueda, filtramos por nombre o ubicación
     if (search) {
       donde[Op.or] = [
         { nombre: { [Op.iLike]: `%${search}%` } },
@@ -18,7 +14,7 @@ exports.obtenerCultivos = async (req, res) => {
     }
 
     const cultivos = await Cultivo.findAll({
-      where: donde, // 🚀 AHORA SÍ: Filtra dinámicamente en la base de datos
+      where: donde,
       include: [{
         model: Usuario,
         as: 'responsable',
@@ -40,9 +36,6 @@ exports.obtenerCultivos = async (req, res) => {
   }
 };
 
-// @desc    Obtener un cultivo
-// @route   GET /api/cultivos/:id
-// @access  Private
 exports.obtenerCultivo = async (req, res) => {
   try {
     const cultivo = await Cultivo.findByPk(req.params.id, {
@@ -72,31 +65,34 @@ exports.obtenerCultivo = async (req, res) => {
   }
 };
 
-// @desc    Crear cultivo
-// @route   POST /api/cultivos
-// @access  Private
 exports.crearCultivo = async (req, res) => {
   try {
     let datosCultivo = { ...req.body };
 
-    // LÓGICA DE NEGOCIO: Estimador predictivo del ciclo fenológico agrícola
     if (!datosCultivo.fechaCosechaEstimada && datosCultivo.fechaSiembra) {
       const fechaSiembra = new Date(datosCultivo.fechaSiembra);
-      
-      // Asignamos meses de maduración estimados según el tipo de cultivo de la base de datos
-      let mesesMaduracion = 3; // Por defecto para vegetales/hortalizas comunes
+      let mesesMaduracion = 3;
       if (datosCultivo.tipo === 'frutal') mesesMaduracion = 12;
       if (datosCultivo.tipo === 'cereal') mesesMaduracion = 6;
       if (datosCultivo.tipo === 'leguminosa') mesesMaduracion = 4;
 
       fechaSiembra.setMonth(fechaSiembra.getMonth() + mesesMaduracion);
       datosCultivo.fechaCosechaEstimada = fechaSiembra.toISOString().split('T')[0];
-      datosCultivo.observaciones = `[CÓMPUTO AUTOMÁTICO]: Fecha de cosecha estimada proyectada de forma autónoma a ${mesesMaduracion} meses plazo según el tipo de cultivo. ` + (datosCultivo.observaciones || '');
+      datosCultivo.observaciones = `[CÓMPUTO AUTOMÁTICO]: Fecha de cosecha estimada proyectada a ${mesesMaduracion} meses. ` + (datosCultivo.observaciones || '');
     }
 
     const cultivo = await Cultivo.create({
       ...datosCultivo,
       responsableId: req.usuario.id
+    });
+
+    await Registro.create({
+      tipo: 'cultivo',
+      categoria: 'Creación de Cultivo',
+      descripcion: `Se creó el cultivo de ${cultivo.nombre} (${cultivo.tipo})`,
+      fecha: new Date(),
+      cultivoId: cultivo.id,
+      registradoPorId: req.usuario.id
     });
 
     res.status(201).json({
@@ -109,9 +105,6 @@ exports.crearCultivo = async (req, res) => {
   }
 };
 
-// @desc    Actualizar cultivo
-// @route   PUT /api/cultivos/:id
-// @access  Private
 exports.actualizarCultivo = async (req, res) => {
   try {
     const cultivo = await Cultivo.findByPk(req.params.id);
@@ -123,8 +116,39 @@ exports.actualizarCultivo = async (req, res) => {
       });
     }
 
+    // 🚀 Detección dinámica general de cambios en cultivos
+    let cambiosCultivo = [];
+    const camposPermitidosCultivo = [
+      'nombre', 'tipo', 'variedad', 'areaHectareas', 'ubicacion', 
+      'estado', 'fechaSiembra', 'fechaCosechaEstimada', 'observaciones'
+    ];
+
+    camposPermitidosCultivo.forEach(campo => {
+      if (req.body[campo] !== undefined && req.body[campo] !== null) {
+        const valorAntiguo = cultivo[campo] !== null ? String(cultivo[campo]) : '';
+        const valorNuevo = String(req.body[campo]);
+
+        if (valorAntiguo !== valorNuevo) {
+          cambiosCultivo.push(`${campo}: '${valorNuevo}'`);
+        }
+      }
+    });
+
     await cultivo.update(req.body);
     await cultivo.reload();
+
+    const detalleCultivo = cambiosCultivo.length > 0 
+      ? `Actualizó: ${cambiosCultivo.join(', ')}` 
+      : 'Se actualizó información general del cultivo';
+
+    await Registro.create({
+      tipo: 'cultivo',
+      categoria: 'Actualización',
+      descripcion: `Cultivo ${cultivo.nombre}: ${detalleCultivo}`,
+      fecha: new Date(),
+      cultivoId: cultivo.id,
+      registradoPorId: req.usuario.id
+    });
 
     res.status(200).json({
       success: true,
@@ -139,9 +163,6 @@ exports.actualizarCultivo = async (req, res) => {
   }
 };
 
-// @desc    Eliminar cultivo
-// @route   DELETE /api/cultivos/:id
-// @access  Private
 exports.eliminarCultivo = async (req, res) => {
   try {
     const cultivo = await Cultivo.findByPk(req.params.id);
@@ -153,7 +174,16 @@ exports.eliminarCultivo = async (req, res) => {
       });
     }
 
+    const nombreCultivo = cultivo.nombre;
     await cultivo.destroy();
+
+    await Registro.create({
+      tipo: 'cultivo',
+      categoria: 'Eliminación',
+      descripcion: `Se eliminó el cultivo ${nombreCultivo}`,
+      fecha: new Date(),
+      registradoPorId: req.usuario.id
+    });
 
     res.status(200).json({
       success: true,

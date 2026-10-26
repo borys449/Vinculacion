@@ -71,8 +71,8 @@ const Ganado = sequelize.define('Ganado', {
     }
   },
   estadoSalud: {
-    type: DataTypes.ENUM('excelente', 'bueno', 'regular', 'enfermo'),
-    defaultValue: 'bueno'
+    type: DataTypes.ENUM('sano', 'en_recuperacion', 'enfermo'),
+    defaultValue: 'sano'
   },
   estado: {
     type: DataTypes.ENUM('activo', 'inactivo', 'vendido', 'enfermo', 'gestacion', 'fallecido'),

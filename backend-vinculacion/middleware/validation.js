@@ -281,7 +281,10 @@ const validateGanadoCommon = [
     .isIn([
       'sano',
       'en recuperacion',
+      'en recuperación',
+      'en_recuperacion',
       'enfermo',
+      'critico',
     ])
     .withMessage('Estado de salud inválido'),
 
