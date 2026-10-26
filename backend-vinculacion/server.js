@@ -38,7 +38,7 @@ app.use(cors(corsOptions));
 // Rate Limiting - Limitar peticiones por IP
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 100, // límite de 100 peticiones por ventana
+  max: process.env.NODE_ENV === 'development' ? 10000 : 100,
   message: 'Demasiadas peticiones desde esta IP, por favor intente más tarde',
 });
 app.use('/api/', limiter);
@@ -46,7 +46,7 @@ app.use('/api/', limiter);
 // Rate Limiting específico para login (más restrictivo)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
-  max: 5, // máximo 5 intentos de login
+  max: process.env.NODE_ENV === 'development' ? 10000 : 20,
   message: 'Demasiados intentos de login, por favor intente más tarde',
 });
 app.use('/api/auth/login', loginLimiter);
