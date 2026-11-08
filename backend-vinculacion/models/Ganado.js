@@ -31,7 +31,7 @@ const Ganado = sequelize.define('Ganado', {
     }
   },
   proposito: {
-    type: DataTypes.ENUM('leche', 'carne', 'doble_proposito'),
+    type: DataTypes.ENUM('leche', 'carne', 'doble_proposito', 'reproduccion'),
     allowNull: true
   },
   produccionEstimadaDiaria: {

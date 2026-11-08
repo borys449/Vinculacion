@@ -27,6 +27,13 @@ import {
   PropositoBovino,
 } from '@/constants/bovinos';
 import {
+  PROPOSITOS_PORCINO,
+  RAZAS_POR_PROPOSITO_PORCINO,
+  TODAS_LAS_RAZAS_PORCINAS,
+  validarPesoEdadPorcino,
+  PropositoPorcino,
+} from '@/constants/porcinos';
+import {
   FiPlus,
   FiEdit,
   FiTrash2,
@@ -119,26 +126,32 @@ export default function GanadoPage() {
 
   // Watchers para lógica reactiva del formulario
   const watchTipo = watch('tipo');
-  const watchProposito = watch('proposito') as PropositoBovino | undefined;
+  const watchProposito = watch('proposito');
   const watchFechaNacimiento = watch('fechaNacimiento');
   const watchPesoActual = watch('pesoActual');
   const watchPesoInicial = watch('pesoInicial');
 
   // Opciones de raza dinámicas filtradas por propósito
   const opcionesRaza = useMemo(() => {
-    if (watchTipo === 'bovino' && watchProposito && RAZAS_POR_PROPOSITO[watchProposito]) {
-      return RAZAS_POR_PROPOSITO[watchProposito];
-    }
     if (watchTipo === 'bovino') {
+      if (watchProposito && RAZAS_POR_PROPOSITO[watchProposito as PropositoBovino]) {
+        return RAZAS_POR_PROPOSITO[watchProposito as PropositoBovino];
+      }
       return TODAS_LAS_RAZAS_BOVINAS;
+    }
+    if (watchTipo === 'porcino') {
+      if (watchProposito && RAZAS_POR_PROPOSITO_PORCINO[watchProposito as PropositoPorcino]) {
+        return RAZAS_POR_PROPOSITO_PORCINO[watchProposito as PropositoPorcino];
+      }
+      return TODAS_LAS_RAZAS_PORCINAS;
     }
     return [];
   }, [watchTipo, watchProposito]);
 
   // Validación biológica en tiempo real (Edad vs. Peso)
   const evaluacionBiologicaForm = useMemo(() => {
-    if (watchTipo !== 'bovino' || !watchFechaNacimiento) {
-      return { edadMeses: null, alertas: [] };
+    if (!watchFechaNacimiento) {
+      return { edadMeses: null, etapa: '', alertas: [] };
     }
     const pesoAValidar =
       watchPesoActual && watchPesoActual > 0
@@ -147,7 +160,17 @@ export default function GanadoPage() {
         ? watchPesoInicial
         : null;
 
-    return validarPesoEdadBovino(watchFechaNacimiento, pesoAValidar);
+    if (watchTipo === 'bovino') {
+      const res = validarPesoEdadBovino(watchFechaNacimiento, pesoAValidar);
+      return { edadMeses: res.edadMeses, etapa: 'Bovino', alertas: res.alertas };
+    }
+
+    if (watchTipo === 'porcino') {
+      const res = validarPesoEdadPorcino(watchFechaNacimiento, pesoAValidar);
+      return { edadMeses: res.edadMeses, etapa: res.etapa, alertas: res.alertas };
+    }
+
+    return { edadMeses: null, etapa: '', alertas: [] };
   }, [watchTipo, watchFechaNacimiento, watchPesoActual, watchPesoInicial]);
 
   // Cargar inventario de ganado
@@ -241,7 +264,7 @@ export default function GanadoPage() {
         observaciones: data.observaciones?.trim() || '',
         pesoInicial: data.pesoInicial || null,
         pesoActual: data.pesoActual || null,
-        proposito: data.tipo === 'bovino' ? data.proposito || null : null,
+        proposito: (data.tipo === 'bovino' || data.tipo === 'porcino') ? data.proposito || null : null,
         produccionEstimadaDiaria:
           data.tipo === 'bovino' ? Number(data.produccionEstimadaDiaria || 0) : 0,
       };
@@ -291,7 +314,7 @@ export default function GanadoPage() {
       identificacion: animal.identificacion,
       tipo: animal.tipo as any,
       raza: animal.raza || '',
-      proposito: (animal.proposito as any) || (animal.tipo === 'bovino' ? 'leche' : ''),
+      proposito: (animal.proposito as any) || (animal.tipo === 'bovino' ? 'leche' : animal.tipo === 'porcino' ? 'carne' : ''),
       produccionEstimadaDiaria: animal.produccionEstimadaDiaria || 0,
       fechaNacimiento: animal.fechaNacimiento ? animal.fechaNacimiento.split('T')[0] : '',
       sexo: animal.sexo as any,
@@ -405,6 +428,10 @@ export default function GanadoPage() {
       label: 'Doble Propósito',
       class: 'bg-purple-100 text-purple-800 border-purple-200',
     },
+    reproduccion: {
+      label: 'Reproducción',
+      class: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    },
   };
 
   const columns = [
@@ -418,7 +445,7 @@ export default function GanadoPage() {
       key: 'proposito',
       label: 'Propósito',
       render: (value: string, row: Ganado) => {
-        if (row.tipo !== 'bovino' || !value) return <span className="text-gray-400 text-xs">-</span>;
+        if ((row.tipo !== 'bovino' && row.tipo !== 'porcino') || !value) return <span className="text-gray-400 text-xs">-</span>;
         const config = propositoBadges[value] || { label: value, class: 'bg-gray-100 text-gray-800' };
         return (
           <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${config.class}`}>
@@ -624,9 +651,10 @@ export default function GanadoPage() {
                     className="bg-white border border-gray-300 rounded-lg text-sm text-gray-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 cursor-pointer"
                   >
                     <option value="todos">Todos los Propósitos</option>
-                    <option value="leche">Leche</option>
+                    <option value="leche">Leche (Bovinos)</option>
                     <option value="carne">Carne</option>
                     <option value="doble_proposito">Doble Propósito</option>
+                    <option value="reproduccion">Reproducción (Porcinos)</option>
                   </select>
 
                   <select
@@ -972,6 +1000,22 @@ export default function GanadoPage() {
                     { value: 'otro', label: 'Otro' },
                   ]}
                   {...register('tipo')}
+                  onChange={(e) => {
+                    const nuevoTipo = e.target.value as any;
+                    setValue('tipo', nuevoTipo);
+                    if (nuevoTipo === 'bovino') {
+                      setValue('proposito', 'leche');
+                      setValue('raza', RAZAS_POR_PROPOSITO['leche'][0]);
+                    } else if (nuevoTipo === 'porcino') {
+                      setValue('proposito', 'carne');
+                      setValue('raza', RAZAS_POR_PROPOSITO_PORCINO['carne'][0]);
+                      setValue('produccionEstimadaDiaria', 0);
+                    } else {
+                      setValue('proposito', '');
+                      setValue('raza', '');
+                      setValue('produccionEstimadaDiaria', 0);
+                    }
+                  }}
                   required
                 />
 
@@ -987,10 +1031,14 @@ export default function GanadoPage() {
                       }))}
                       {...register('proposito')}
                       onChange={(e) => {
-                        setValue('proposito', e.target.value as any);
-                        const razas = RAZAS_POR_PROPOSITO[e.target.value as PropositoBovino];
+                        const nuevoProposito = e.target.value as PropositoBovino;
+                        setValue('proposito', nuevoProposito);
+                        const razas = RAZAS_POR_PROPOSITO[nuevoProposito];
                         if (razas && razas.length > 0) {
-                          setValue('raza', razas[0]);
+                          const razaActual = watch('raza');
+                          if (!razaActual || !razas.includes(razaActual)) {
+                            setValue('raza', razas[0]);
+                          }
                         }
                       }}
                       required
@@ -1020,12 +1068,52 @@ export default function GanadoPage() {
                   </>
                 )}
 
-                {watchTipo !== 'bovino' && (
+                {/* Campos específicos de Porcinos: Propósito y Raza filtrada */}
+                {watchTipo === 'porcino' && (
+                  <>
+                    <Select
+                      label="Propósito Productivo (Porcino)"
+                      error={errors.proposito?.message}
+                      options={PROPOSITOS_PORCINO.map((p) => ({
+                        value: p.value,
+                        label: p.label,
+                      }))}
+                      {...register('proposito')}
+                      onChange={(e) => {
+                        const nuevoProposito = e.target.value as PropositoPorcino;
+                        setValue('proposito', nuevoProposito);
+                        const razas = RAZAS_POR_PROPOSITO_PORCINO[nuevoProposito];
+                        if (razas && razas.length > 0) {
+                          const razaActual = watch('raza');
+                          if (!razaActual || !razas.includes(razaActual)) {
+                            setValue('raza', razas[0]);
+                          }
+                        }
+                      }}
+                      required
+                    />
+
+                    <div>
+                      <Select
+                        label="Raza Porcina (Filtrada por Propósito)"
+                        error={errors.raza?.message}
+                        options={opcionesRaza.map((r) => ({
+                          value: r,
+                          label: r,
+                        }))}
+                        {...register('raza')}
+                        required
+                      />
+                    </div>
+                  </>
+                )}
+
+                {watchTipo !== 'bovino' && watchTipo !== 'porcino' && (
                   <Input
                     label="Raza"
                     error={errors.raza?.message}
                     {...register('raza')}
-                    placeholder="Ej: Landrace, Dorper, etc."
+                    placeholder="Ej: Dorper, Boer, etc."
                     suggestions={Array.from(new Set(ganado.map((g) => g.raza).filter(Boolean) as string[]))}
                     required
                   />
@@ -1099,7 +1187,7 @@ export default function GanadoPage() {
                   <div className="flex items-center space-x-2 text-amber-800 font-semibold text-sm">
                     <FiAlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
                     <span>
-                      Control Biológico de Desarrollo ({evaluacionBiologicaForm.edadMeses} meses de edad)
+                      Control Biológico de Desarrollo ({evaluacionBiologicaForm.etapa ? `${evaluacionBiologicaForm.etapa} - ` : ''}{evaluacionBiologicaForm.edadMeses} meses de edad)
                     </span>
                   </div>
                   {evaluacionBiologicaForm.alertas.map((alerta, idx) => (

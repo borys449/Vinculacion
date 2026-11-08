@@ -250,8 +250,8 @@ const validateGanadoCommon = [
 
   body('proposito')
     .optional({ checkFalsy: true })
-    .isIn(['leche', 'carne', 'doble_proposito'])
-    .withMessage('Propósito inválido. Debe ser leche, carne o doble_proposito'),
+    .isIn(['leche', 'carne', 'doble_proposito', 'reproduccion'])
+    .withMessage('Propósito inválido. Debe ser leche, carne, doble_proposito o reproduccion'),
 
   body('produccionEstimadaDiaria')
     .optional({ checkFalsy: true })

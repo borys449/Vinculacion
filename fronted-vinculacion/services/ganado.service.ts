@@ -5,7 +5,7 @@ export interface Ganado {
   identificacion: string;
   tipo: 'bovino' | 'porcino' | 'ovino' | 'caprino' | 'avicola' | 'otro';
   raza?: string | null;
-  proposito?: 'leche' | 'carne' | 'doble_proposito' | null;
+  proposito?: 'leche' | 'carne' | 'doble_proposito' | 'reproduccion' | null;
   produccionEstimadaDiaria?: number | null;
   fechaNacimiento: string;
   sexo: 'macho' | 'hembra';

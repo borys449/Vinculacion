@@ -23,15 +23,21 @@ function calcularEdadEnMeses(fechaNacimiento, fechaReferencia = new Date()) {
 
 /**
  * Validaciones biológicas (Edad vs. Peso) según especificación técnica
- * 0 a 1 mes (Recién nacido): 25 - 50 kg (Alerta < 20 kg o > 60 kg)
- * 2 a 6 meses (Ternero): 60 - 180 kg (Alerta desnutrición < 50 kg)
- * > 24 meses (Adulto): 350 - 750+ kg (Alerta < 350 kg)
+ * Bovinos:
+ *   0 a 1 mes (Recién nacido): 25 - 50 kg (Alerta < 20 kg o > 60 kg)
+ *   2 a 6 meses (Ternero): 60 - 180 kg (Alerta desnutrición < 50 kg)
+ *   > 24 meses (Adulto): 350 - 750+ kg (Alerta < 350 kg)
+ * Porcinos:
+ *   0 a 1 mes (Lechón lactante): 1.2 - 10 kg (Alerta < 1.0 kg o > 15 kg)
+ *   2 a 3 meses (Lechón destetado / Recría): 15 - 50 kg (Alerta desnutrición < 12 kg o > 65 kg)
+ *   4 a 6 meses (Crecimiento y engorde / Cebo): 45 - 130 kg (Alerta < 40 kg o > 160 kg)
+ *   > 6 meses (Adulto / Reproductor): 120 - 350+ kg (Alerta < 90 kg o > 420 kg)
  *
  * @param {Object} params
  * @param {string} params.tipo
  * @param {string|Date} params.fechaNacimiento
  * @param {number|string} params.peso
- * @returns {{ edadMeses: number|null, advertencias: string[] }}
+ * @returns {{ edadMeses: number|null, advertencias: string[], errorCritico?: boolean }}
  */
 function validarRangosBiologicos({ tipo, fechaNacimiento, peso }) {
   const advertencias = [];
@@ -45,8 +51,10 @@ function validarRangosBiologicos({ tipo, fechaNacimiento, peso }) {
     return { edadMeses: null, advertencias, errorCritico: true };
   }
 
-  // Aplicable principalmente a bovinos
-  if (tipo && tipo.toLowerCase() !== 'bovino') {
+  const tipoNormalizado = tipo ? tipo.toLowerCase().trim() : '';
+
+  // Aplicable a bovinos y porcinos
+  if (tipoNormalizado !== 'bovino' && tipoNormalizado !== 'porcino') {
     return { edadMeses: null, advertencias };
   }
 
@@ -55,40 +63,107 @@ function validarRangosBiologicos({ tipo, fechaNacimiento, peso }) {
     return { edadMeses: null, advertencias };
   }
 
-  // 0 a 1 mes (Recién nacido)
-  if (edadMeses <= 1) {
-    if (pesoNum < 20) {
-      advertencias.push(
-        `Alerta biológica: El peso ingresado (${pesoNum.toFixed(1)} kg) es inferior al mínimo biológico para un recién nacido (0-1 mes). Rango esperado: 25 - 50 kg (Alerta < 20 kg).`
-      );
-    } else if (pesoNum > 60) {
-      advertencias.push(
-        `Alerta biológica: El peso ingresado (${pesoNum.toFixed(1)} kg) excede el umbral máximo para un recién nacido (0-1 mes). Rango esperado: 25 - 50 kg (Alerta > 60 kg).`
-      );
+  // Validaciones para Bovinos
+  if (tipoNormalizado === 'bovino') {
+    // 0 a 1 mes (Recién nacido)
+    if (edadMeses <= 1) {
+      if (pesoNum < 20) {
+        advertencias.push(
+          `Alerta biológica: El peso ingresado (${pesoNum.toFixed(1)} kg) es inferior al mínimo biológico para un recién nacido (0-1 mes). Rango esperado: 25 - 50 kg (Alerta < 20 kg).`
+        );
+      } else if (pesoNum > 60) {
+        advertencias.push(
+          `Alerta biológica: El peso ingresado (${pesoNum.toFixed(1)} kg) excede el umbral máximo para un recién nacido (0-1 mes). Rango esperado: 25 - 50 kg (Alerta > 60 kg).`
+        );
+      }
+    }
+    // 2 a 6 meses (Ternero)
+    else if (edadMeses >= 2 && edadMeses <= 6) {
+      if (pesoNum < 50) {
+        advertencias.push(
+          `Alerta de desnutrición: Peso crítico (${pesoNum.toFixed(1)} kg < 50 kg) para ternero de ${edadMeses} meses. Rango esperado: 60 - 180 kg.`
+        );
+      } else if (pesoNum < 60) {
+        advertencias.push(
+          `Advertencia biológica: El peso (${pesoNum.toFixed(1)} kg) se encuentra por debajo del promedio esperado (60 - 180 kg) para terneros de 2 a 6 meses.`
+        );
+      } else if (pesoNum > 180) {
+        advertencias.push(
+          `Advertencia biológica: El peso (${pesoNum.toFixed(1)} kg) supera el rango típico (60 - 180 kg) para la etapa de ternero.`
+        );
+      }
+    }
+    // > 24 meses (Adulto)
+    else if (edadMeses > 24) {
+      if (pesoNum < 350) {
+        advertencias.push(
+          `Alerta biológica: El peso (${pesoNum.toFixed(1)} kg) está por debajo del rango esperado para un bovino adulto (> 24 meses). Rango esperado: 350 - 750+ kg.`
+        );
+      }
     }
   }
-  // 2 a 6 meses (Ternero)
-  else if (edadMeses >= 2 && edadMeses <= 6) {
-    if (pesoNum < 50) {
-      advertencias.push(
-        `Alerta de desnutrición: Peso crítico (${pesoNum.toFixed(1)} kg < 50 kg) para ternero de ${edadMeses} meses. Rango esperado: 60 - 180 kg.`
-      );
-    } else if (pesoNum < 60) {
-      advertencias.push(
-        `Advertencia biológica: El peso (${pesoNum.toFixed(1)} kg) se encuentra por debajo del promedio esperado (60 - 180 kg) para terneros de 2 a 6 meses.`
-      );
-    } else if (pesoNum > 180) {
-      advertencias.push(
-        `Advertencia biológica: El peso (${pesoNum.toFixed(1)} kg) supera el rango típico (60 - 180 kg) para la etapa de ternero.`
-      );
+
+  // Validaciones para Porcinos
+  else if (tipoNormalizado === 'porcino') {
+    // 0 a 1 mes: Lechón lactante
+    if (edadMeses <= 1) {
+      if (pesoNum < 1.0) {
+        advertencias.push(
+          `Alerta biológica: Para un lechón lactante (0-1 mes), el peso ingresado (${pesoNum.toFixed(1)} kg) está por debajo del mínimo crítico (< 1.0 kg). Rango esperado: 1.2 - 10 kg.`
+        );
+      } else if (pesoNum < 1.2) {
+        advertencias.push(
+          `Advertencia biológica: El peso (${pesoNum.toFixed(1)} kg) está por debajo del promedio esperado (1.2 - 10 kg) para un lechón lactante.`
+        );
+      } else if (pesoNum > 15) {
+        advertencias.push(
+          `Advertencia biológica: El peso ingresado (${pesoNum.toFixed(1)} kg) supera el rango esperado para un lechón lactante (0-1 mes).`
+        );
+      }
     }
-  }
-  // > 24 meses (Adulto)
-  else if (edadMeses > 24) {
-    if (pesoNum < 350) {
-      advertencias.push(
-        `Alerta biológica: El peso (${pesoNum.toFixed(1)} kg) está por debajo del rango esperado para un bovino adulto (> 24 meses). Rango esperado: 350 - 750+ kg.`
-      );
+    // 2 a 3 meses: Lechón destetado / Recría
+    else if (edadMeses >= 2 && edadMeses <= 3) {
+      if (pesoNum < 12) {
+        advertencias.push(
+          `Alerta de desnutrición: Peso crítico (${pesoNum.toFixed(1)} kg < 12 kg) para lechón en etapa de recría (${edadMeses} meses). Rango esperado: 15 - 50 kg.`
+        );
+      } else if (pesoNum < 15) {
+        advertencias.push(
+          `Advertencia biológica: El peso (${pesoNum.toFixed(1)} kg) está por debajo del rango esperado (15 - 50 kg) para lechones destetados de 2 a 3 meses.`
+        );
+      } else if (pesoNum > 65) {
+        advertencias.push(
+          `Advertencia biológica: El peso (${pesoNum.toFixed(1)} kg) supera el rango esperado (15 - 50 kg) para un lechón de ${edadMeses} meses.`
+        );
+      }
+    }
+    // 4 a 6 meses: Crecimiento y engorde (Cebo)
+    else if (edadMeses >= 4 && edadMeses <= 6) {
+      if (pesoNum < 40) {
+        advertencias.push(
+          `Alerta de retraso en engorde: Peso insuficiente (${pesoNum.toFixed(1)} kg < 40 kg) para cerdo en etapa de cebo (${edadMeses} meses). Rango esperado: 45 - 130 kg.`
+        );
+      } else if (pesoNum < 45) {
+        advertencias.push(
+          `Advertencia biológica: El peso (${pesoNum.toFixed(1)} kg) está por debajo de la meta de desarrollo (45 - 130 kg) para cerdos de 4 a 6 meses.`
+        );
+      } else if (pesoNum > 160) {
+        advertencias.push(
+          `Advertencia biológica: El peso (${pesoNum.toFixed(1)} kg) excede el estándar de salida para cerdos de engorde de ${edadMeses} meses.`
+        );
+      }
+    }
+    // > 6 meses: Cerdo adulto / Reproductor
+    else if (edadMeses > 6) {
+      if (pesoNum < 90) {
+        advertencias.push(
+          `Alerta biológica: Para un porcino adulto o reproductor (> 6 meses, edad: ${edadMeses} meses), el peso (${pesoNum.toFixed(1)} kg) es bajo. Rango esperado: 120 - 350+ kg.`
+        );
+      } else if (pesoNum > 420) {
+        advertencias.push(
+          `Advertencia biológica: El peso (${pesoNum.toFixed(1)} kg) es inusualmente alto incluso para un reproductor porcino adulto.`
+        );
+      }
     }
   }
 

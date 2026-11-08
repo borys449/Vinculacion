@@ -15,7 +15,7 @@ export const ganadoSchema = z.object({
     .optional()
     .or(z.literal('')),
   proposito: z
-    .enum(['leche', 'carne', 'doble_proposito', ''], {
+    .enum(['leche', 'carne', 'doble_proposito', 'reproduccion', ''], {
       message: 'Propósito no válido',
     })
     .optional(),
@@ -32,13 +32,10 @@ export const ganadoSchema = z.object({
   sexo: z.enum(['macho', 'hembra'], {
     message: 'Sexo no válido',
   }),
-  // En tu archivo ganadoSchema.ts
-estadoSalud: z.enum(['sano', 'en_recuperacion', 'enfermo']),
-  
+  estadoSalud: z.enum(['sano', 'en_recuperacion', 'enfermo']),
   estado: z.enum(['activo', 'inactivo', 'vendido', 'enfermo', 'gestacion', 'fallecido'], {
     message: 'Estado de gestión no válido',
   }),
-
   pesoInicial: z
     .number({ message: 'El peso inicial debe ser un número' })
     .min(0, 'El peso inicial no puede ser negativo')
