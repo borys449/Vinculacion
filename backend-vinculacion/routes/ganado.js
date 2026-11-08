@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect, autorizarArea } = require('../middleware/auth');
+const uploadAnimalPhoto = require('../middleware/animalPhotoUpload');
 const {
   validateGanadoCreate,
   validateGanadoUpdate,
@@ -16,6 +17,7 @@ const {
   obtenerControlLechero,
   obtenerResumenControlLechero,
   registrarOrdenio,
+  obtenerFotoAnimal,
 } = require('../controllers/ganadoController');
 
 router.use(protect);
@@ -26,7 +28,7 @@ router.get('/control-lechero/resumen', obtenerResumenControlLechero);
 router
   .route('/')
   .get(obtenerGanado)
-  .post(validateGanadoCreate, validate, crearAnimal);
+  .post(uploadAnimalPhoto, validateGanadoCreate, validate, crearAnimal);
 
 router.get('/:id/control-lechero', validateId, validate, obtenerControlLechero);
 router.post('/:id/ordenio', validateId, validate, registrarOrdenio);
@@ -34,7 +36,9 @@ router.post('/:id/ordenio', validateId, validate, registrarOrdenio);
 router
   .route('/:id')
   .get(validateId, validate, obtenerAnimal)
-  .put([validateId, ...validateGanadoUpdate], validate, actualizarAnimal)
+  .put([validateId, uploadAnimalPhoto, ...validateGanadoUpdate], validate, actualizarAnimal)
   .delete(validateId, validate, eliminarAnimal);
+
+router.get('/:id/foto', validateId, validate, obtenerFotoAnimal);
 
 module.exports = router;

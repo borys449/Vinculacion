@@ -1,6 +1,11 @@
 const { Ganado, Usuario, Registro } = require('../models');
 const { Op } = require('sequelize');
 const {
+  saveAnimalPhoto,
+  getAnimalPhotoPath,
+  deleteAnimalPhoto,
+} = require('../utils/animalPhoto');
+const {
   validarRangosBiologicos,
   calcularProduccionLechera,
   calcularEdadEnMeses,
@@ -114,6 +119,8 @@ exports.obtenerAnimal = async (req, res) => {
 };
 
 exports.crearAnimal = async (req, res) => {
+  let fotoGuardada;
+  let animalCreado = false;
   try {
     const { tipo, fechaNacimiento, pesoInicial, pesoActual } = req.body;
     const pesoParaValidar = pesoActual !== undefined && pesoActual !== null ? pesoActual : pesoInicial;
@@ -131,10 +138,16 @@ exports.crearAnimal = async (req, res) => {
       });
     }
 
+    if (req.file) {
+      fotoGuardada = await saveAnimalPhoto(req.file);
+    }
+
     const animal = await Ganado.create({
       ...req.body,
+      ...(fotoGuardada ? { foto: fotoGuardada } : {}),
       responsableId: req.usuario.id
     });
+    animalCreado = true;
 
     await Registro.create({
       tipo: 'ganado',
@@ -152,6 +165,9 @@ exports.crearAnimal = async (req, res) => {
       data: animal
     });
   } catch (error) {
+    if (fotoGuardada && !animalCreado) {
+      await deleteAnimalPhoto(fotoGuardada);
+    }
     res.status(400).json({
       success: false,
       message: error.message
@@ -160,6 +176,8 @@ exports.crearAnimal = async (req, res) => {
 };
 
 exports.actualizarAnimal = async (req, res) => {
+  let fotoGuardada;
+  let fotoPersistida = false;
   try {
     const animal = await Ganado.findByPk(req.params.id);
 
@@ -201,6 +219,7 @@ exports.actualizarAnimal = async (req, res) => {
     });
 
     let datosActualizar = { ...req.body };
+    delete datosActualizar.foto;
 
     if (req.body.estado) {
       datosActualizar.estado = req.body.estado;
@@ -216,6 +235,7 @@ exports.actualizarAnimal = async (req, res) => {
       }
     }
 
+    const fotoAnterior = animal.foto;
     const tipoAnimal = req.body.tipo || animal.tipo;
     const fechaNacimiento = req.body.fechaNacimiento || animal.fechaNacimiento;
     const pesoParaValidar = req.body.pesoActual !== undefined ? req.body.pesoActual : (req.body.pesoInicial !== undefined ? req.body.pesoInicial : animal.pesoActual);
@@ -233,8 +253,17 @@ exports.actualizarAnimal = async (req, res) => {
       });
     }
 
+    if (req.file) {
+      fotoGuardada = await saveAnimalPhoto(req.file);
+      datosActualizar.foto = fotoGuardada;
+    }
+
     await animal.update(datosActualizar);
+    fotoPersistida = Boolean(fotoGuardada);
     await animal.reload();
+    if (fotoGuardada && fotoAnterior) {
+      await deleteAnimalPhoto(fotoAnterior);
+    }
 
     const detalleCambio = cambiosRealizados.length > 0 
       ? `Actualizó: ${cambiosRealizados.join(', ')}` 
@@ -256,6 +285,31 @@ exports.actualizarAnimal = async (req, res) => {
       data: animal
     });
   } catch (error) {
+    if (fotoGuardada && !fotoPersistida) {
+      await deleteAnimalPhoto(fotoGuardada);
+    }
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+exports.obtenerFotoAnimal = async (req, res) => {
+  try {
+    const animal = await Ganado.findByPk(req.params.id, { attributes: ['id', 'foto'] });
+    const fotoPath = animal && getAnimalPhotoPath(animal.foto);
+
+    if (!fotoPath) {
+      return res.status(404).json({ success: false, message: 'El animal no tiene foto registrada' });
+    }
+
+    res.sendFile(fotoPath, (error) => {
+      if (error && !res.headersSent) {
+        res.status(error.statusCode || 404).json({
+          success: false,
+          message: error.statusCode === 404 ? 'La foto del animal no está disponible' : 'No se pudo cargar la foto',
+        });
+      }
+    });
+  } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -272,7 +326,11 @@ exports.eliminarAnimal = async (req, res) => {
     }
 
     const ident = animal.identificacion;
+    const foto = animal.foto;
     await animal.destroy();
+    if (foto) {
+      await deleteAnimalPhoto(foto);
+    }
 
     await Registro.create({
       tipo: 'ganado',

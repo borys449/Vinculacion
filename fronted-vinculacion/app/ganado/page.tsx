@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { isAxiosError } from 'axios';
 import { useAuth } from '@/context/AuthContext';
 import { useForm, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -44,6 +46,7 @@ import {
   FiCalendar,
   FiCheckCircle,
   FiInfo,
+  FiEye,
 } from 'react-icons/fi';
 import { GiCow, GiMilkCarton } from 'react-icons/gi';
 import { format } from 'date-fns';
@@ -78,6 +81,79 @@ export default function GanadoPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAnimal, setEditingAnimal] = useState<Ganado | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [animalDetail, setAnimalDetail] = useState<Ganado | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailPhotoUrl, setDetailPhotoUrl] = useState<string | null>(null);
+  const [editingPhotoUrl, setEditingPhotoUrl] = useState<string | null>(null);
+  const [detailPhotoLoading, setDetailPhotoLoading] = useState(false);
+  const photoPreviewUrl = useMemo(
+    () => (selectedPhoto ? URL.createObjectURL(selectedPhoto) : null),
+    [selectedPhoto]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    };
+  }, [photoPreviewUrl]);
+
+  useEffect(() => {
+    if (!modalOpen || !editingAnimal?.foto) {
+      setEditingPhotoUrl(null);
+      return;
+    }
+
+    let active = true;
+    let objectUrl: string | null = null;
+    ganadoService.getPhoto(editingAnimal.id)
+      .then((blob) => {
+        if (active) {
+          objectUrl = URL.createObjectURL(blob);
+          setEditingPhotoUrl(objectUrl);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('Error loading animal photo for editing:', error);
+        if (active) setEditingPhotoUrl(null);
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [modalOpen, editingAnimal?.id, editingAnimal?.foto]);
+
+  useEffect(() => {
+    if (!detailModalOpen || !animalDetail?.foto) {
+      setDetailPhotoUrl(null);
+      setDetailPhotoLoading(false);
+      return;
+    }
+
+    let active = true;
+    let objectUrl: string | null = null;
+    setDetailPhotoLoading(true);
+    ganadoService.getPhoto(animalDetail.id)
+      .then((blob) => {
+        if (active) {
+          objectUrl = URL.createObjectURL(blob);
+          setDetailPhotoUrl(objectUrl);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('Error loading animal photo:', error);
+        if (active) setDetailPhotoUrl(null);
+      })
+      .finally(() => {
+        if (active) setDetailPhotoLoading(false);
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [detailModalOpen, animalDetail?.id, animalDetail?.foto]);
 
   // Estados para búsqueda y filtrado de inventario
   const [searchTerm, setSearchTerm] = useState('');
@@ -270,13 +346,13 @@ export default function GanadoPage() {
       };
 
       if (editingAnimal) {
-        const res = await ganadoService.update(editingAnimal.id, payload);
+        const res = await ganadoService.update(editingAnimal.id, payload, selectedPhoto);
         toast.success('Animal actualizado exitosamente');
         if (res.advertenciasBiologicas?.length) {
           toast(res.advertenciasBiologicas[0], { icon: '⚠️', duration: 5000 });
         }
       } else {
-        const res = await ganadoService.create(payload);
+        const res = await ganadoService.create(payload, selectedPhoto);
         toast.success('Animal registrado exitosamente');
         if (res.advertenciasBiologicas?.length) {
           toast(res.advertenciasBiologicas[0], { icon: '⚠️', duration: 5000 });
@@ -310,6 +386,7 @@ export default function GanadoPage() {
 
   const handleEdit = (animal: Ganado) => {
     setEditingAnimal(animal);
+    setSelectedPhoto(null);
     reset({
       identificacion: animal.identificacion,
       tipo: animal.tipo as any,
@@ -330,6 +407,7 @@ export default function GanadoPage() {
 
   const handleOpenNewModal = () => {
     setEditingAnimal(null);
+    setSelectedPhoto(null);
     reset({
       identificacion: `GAN-${Math.floor(100000 + Math.random() * 900000)}`,
       tipo: 'bovino',
@@ -351,6 +429,23 @@ export default function GanadoPage() {
   const handleCloseModal = () => {
     setModalOpen(false);
     setEditingAnimal(null);
+    setSelectedPhoto(null);
+  };
+
+  const handleViewDetails = async (animal: Ganado) => {
+    try {
+      const response = await ganadoService.getById(animal.id);
+      setAnimalDetail(response.data);
+      setDetailModalOpen(true);
+    } catch (error: unknown) {
+      console.error('Error loading animal details:', error);
+      const message = isAxiosError(error)
+        ? error.response?.data?.message || error.message
+        : error instanceof Error
+          ? error.message
+          : 'Error desconocido';
+      toast.error(`No se pudo cargar el detalle: ${message}`);
+    }
   };
 
   // Guardar Ordeño Diario
@@ -530,6 +625,14 @@ export default function GanadoPage() {
       label: 'Acciones',
       render: (_: any, row: Ganado) => (
         <div className="flex items-center space-x-2">
+          <button
+            onClick={() => handleViewDetails(row)}
+            className="p-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md transition-colors"
+            title="Ver detalle"
+            aria-label={`Ver detalle de ${row.identificacion}`}
+          >
+            <FiEye className="h-4 w-4" />
+          </button>
           {row.tipo === 'bovino' && (
             <button
               onClick={() => irAControlLecheroVaca(row.id)}
@@ -1181,6 +1284,30 @@ export default function GanadoPage() {
                 />
               </div>
 
+              <div>
+                <label htmlFor="foto-animal" className="block text-sm font-medium text-gray-700 mb-1">
+                  Foto del animal
+                </label>
+                <input
+                  id="foto-animal"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) => setSelectedPhoto(event.target.files?.[0] || null)}
+                  className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100"
+                />
+                <p className="mt-1 text-xs text-gray-500">JPG, PNG o WebP; máximo 5 MB.</p>
+                {(photoPreviewUrl || editingPhotoUrl) && (
+                  <Image
+                    unoptimized
+                    width={144}
+                    height={144}
+                    src={photoPreviewUrl || editingPhotoUrl!}
+                    alt="Vista previa de la foto del animal"
+                    className="mt-3 h-36 w-36 rounded-lg border border-gray-200 object-cover"
+                  />
+                )}
+              </div>
+
               {/* Alertas Biológicas Interactivas (Edad vs. Peso) */}
               {evaluacionBiologicaForm.alertas.length > 0 && (
                 <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg space-y-1">
@@ -1217,6 +1344,57 @@ export default function GanadoPage() {
                 </Button>
               </div>
             </form>
+          </Modal>
+
+          <Modal
+            isOpen={detailModalOpen}
+            onClose={() => setDetailModalOpen(false)}
+            title={animalDetail ? `Detalle del animal ${animalDetail.identificacion}` : 'Detalle del animal'}
+            size="lg"
+          >
+            {animalDetail && (
+              <div className="space-y-5">
+                {detailPhotoLoading ? (
+                  <div className="flex h-40 items-center justify-center rounded-xl bg-gray-50 text-gray-500">
+                    Cargando foto...
+                  </div>
+                ) : detailPhotoUrl ? (
+                  <Image
+                    unoptimized
+                    width={800}
+                    height={512}
+                    src={detailPhotoUrl}
+                    alt={`Foto de ${animalDetail.identificacion}`}
+                    className="h-64 w-full rounded-xl bg-gray-50 object-contain"
+                  />
+                ) : animalDetail.foto ? (
+                  <div className="flex h-40 items-center justify-center rounded-xl bg-gray-50 text-gray-500">
+                    No se pudo cargar la foto del animal.
+                  </div>
+                ) : (
+                  <div className="flex h-40 items-center justify-center rounded-xl bg-gray-50 text-gray-500">
+                    Este animal todavía no tiene foto.
+                  </div>
+                )}
+                <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {[
+                    ['Tipo', animalDetail.tipo],
+                    ['Raza', animalDetail.raza || 'Sin especificar'],
+                    ['Sexo', animalDetail.sexo],
+                    ['Fecha de nacimiento', animalDetail.fechaNacimiento],
+                    ['Peso actual', animalDetail.pesoActual ? `${animalDetail.pesoActual} kg` : 'Sin registrar'],
+                    ['Estado de salud', animalDetail.estadoSalud],
+                    ['Estado', animalDetail.estado],
+                    ['Observaciones', animalDetail.observaciones || 'Sin observaciones'],
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="text-sm font-medium text-gray-500">{label}</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
           </Modal>
 
           {/* ========================================================================= */}

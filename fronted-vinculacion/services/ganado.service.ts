@@ -14,6 +14,7 @@ export interface Ganado {
   estadoSalud: 'excelente' | 'bueno' | 'regular' | 'enfermo';
   estado: 'activo' | 'inactivo' | 'vendido' | 'enfermo' | 'gestacion' | 'fallecido';
   observaciones?: string | null;
+  foto?: string | null;
   responsableId: number;
   responsable?: any;
   activo: boolean;
@@ -70,13 +71,20 @@ export const ganadoService = {
     return response.data;
   },
 
-  create: async (data: GanadoFormData) => {
-    const response = await api.post('/ganado', data);
+  create: async (data: GanadoFormData, foto?: File | null) => {
+    const body = foto ? createAnimalFormData(data, foto) : data;
+    const response = await api.post('/ganado', body, foto ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined);
     return response.data;
   },
 
-  update: async (id: number, data: Partial<GanadoFormData>) => {
-    const response = await api.put(`/ganado/${id}`, data);
+  update: async (id: number, data: Partial<GanadoFormData>, foto?: File | null) => {
+    const body = foto ? createAnimalFormData(data, foto) : data;
+    const response = await api.put(`/ganado/${id}`, body, foto ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined);
+    return response.data;
+  },
+
+  getPhoto: async (id: number): Promise<Blob> => {
+    const response = await api.get(`/ganado/${id}/foto`, { responseType: 'blob' });
     return response.data;
   },
 
@@ -103,3 +111,10 @@ export const ganadoService = {
     return response.data;
   },
 };
+
+function createAnimalFormData(data: object, foto: File) {
+  const formData = new FormData();
+  formData.append('data', JSON.stringify(data));
+  formData.append('foto', foto);
+  return formData;
+}

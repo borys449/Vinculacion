@@ -83,6 +83,10 @@ const Ganado = sequelize.define('Ganado', {
     type: DataTypes.TEXT,
     allowNull: true
   },
+  foto: {
+    type: DataTypes.STRING(255),
+    allowNull: true
+  },
   responsableId: {
     type: DataTypes.INTEGER,
     allowNull: false,
