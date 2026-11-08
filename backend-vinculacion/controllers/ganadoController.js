@@ -84,6 +84,10 @@ exports.obtenerAnimal = async (req, res) => {
     const pesoEval = animal.pesoActual || animal.pesoInicial;
     const evaluacionBiologica = validarRangosBiologicos({
       tipo: animal.tipo,
+      especie: animal.especie,
+      sexo: animal.sexo,
+      proposito: animal.proposito,
+      raza: animal.raza,
       fechaNacimiento: animal.fechaNacimiento,
       peso: pesoEval
     });
@@ -127,6 +131,10 @@ exports.crearAnimal = async (req, res) => {
 
     const evalBiologica = validarRangosBiologicos({
       tipo,
+      especie: req.body.especie,
+      sexo: req.body.sexo,
+      proposito: req.body.proposito,
+      raza: req.body.raza,
       fechaNacimiento,
       peso: pesoParaValidar
     });
@@ -226,8 +234,8 @@ exports.actualizarAnimal = async (req, res) => {
     }
 
     if (req.body.pesoActual && animal.pesoInicial) {
-      const pesoActualNum = parseFloat(req.body.pesoActual);
-      const pesoInicialNum = parseFloat(animal.pesoInicial);
+      const pesoActualNum = Number.parseFloat(req.body.pesoActual);
+      const pesoInicialNum = Number.parseFloat(animal.pesoInicial);
 
       if (pesoActualNum < pesoInicialNum * 0.9) {
         datosActualizar.estadoSalud = 'enfermo';
@@ -238,10 +246,20 @@ exports.actualizarAnimal = async (req, res) => {
     const fotoAnterior = animal.foto;
     const tipoAnimal = req.body.tipo || animal.tipo;
     const fechaNacimiento = req.body.fechaNacimiento || animal.fechaNacimiento;
-    const pesoParaValidar = req.body.pesoActual !== undefined ? req.body.pesoActual : (req.body.pesoInicial !== undefined ? req.body.pesoInicial : animal.pesoActual);
+    let pesoParaValidar = animal.pesoActual;
+    if (req.body.pesoInicial !== undefined) {
+      pesoParaValidar = req.body.pesoInicial;
+    }
+    if (req.body.pesoActual !== undefined) {
+      pesoParaValidar = req.body.pesoActual;
+    }
 
     const evalBiologica = validarRangosBiologicos({
       tipo: tipoAnimal,
+      especie: req.body.especie || animal.especie,
+      sexo: req.body.sexo || animal.sexo,
+      proposito: req.body.proposito || animal.proposito,
+      raza: req.body.raza || animal.raza,
       fechaNacimiento,
       peso: pesoParaValidar
     });
@@ -452,15 +470,15 @@ exports.obtenerResumenControlLechero = async (req, res) => {
     }
 
     const promedioDiarioHato = bovinos.length > 0 
-      ? parseFloat((sumaPromediosDiarios / bovinos.length).toFixed(2)) 
+      ? Number.parseFloat((sumaPromediosDiarios / bovinos.length).toFixed(2))
       : 0;
 
     res.status(200).json({
       success: true,
       data: {
-        produccionHoy: parseFloat(produccionTotalHoy.toFixed(2)),
+        produccionHoy: Number.parseFloat(produccionTotalHoy.toFixed(2)),
         promedioDiario: promedioDiarioHato,
-        totalMes: parseFloat(totalAcumuladoMes.toFixed(2)),
+        totalMes: Number.parseFloat(totalAcumuladoMes.toFixed(2)),
         totalBovinos: bovinos.length,
         bovinosConRegistros: Object.keys(registrosPorAnimal).length,
         ultimosRegistros: registrosLecheMes.slice(0, 15),
@@ -488,8 +506,8 @@ exports.registrarOrdenio = async (req, res) => {
 
     const { cantidad, fecha, observaciones, sesion } = req.body;
 
-    const litros = parseFloat(cantidad);
-    if (isNaN(litros) || litros <= 0) {
+    const litros = Number.parseFloat(cantidad);
+    if (Number.isNaN(litros) || litros <= 0) {
       return res.status(400).json({
         success: false,
         message: 'La cantidad de leche en litros debe ser un número mayor a cero'

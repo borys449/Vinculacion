@@ -115,6 +115,7 @@ describe('Módulo de Ganadería (Bovinos y Porcinos) - Pruebas Unitarias', () =>
         fechaNacimiento: hace20Dias,
         peso: 0.8,
       });
+
       expect(resCritico.advertencias.length).toBeGreaterThan(0);
       expect(resCritico.advertencias[0]).toContain('mínimo crítico');
 
@@ -200,6 +201,79 @@ describe('Módulo de Ganadería (Bovinos y Porcinos) - Pruebas Unitarias', () =>
         peso: 220,
       });
       expect(resOk.advertencias.length).toBe(0);
+    });
+  });
+
+  describe('Validaciones biológicas de ovíparos', () => {
+    const haceMeses = (meses) => {
+      const fecha = new Date();
+      fecha.setDate(1);
+      fecha.setMonth(fecha.getMonth() - meses);
+      return fecha.toISOString().slice(0, 10);
+    };
+
+    test('usa etapas distintas para codornices y gansos', () => {
+      const codorniz = validarRangosBiologicos({
+        tipo: 'oviparo',
+        especie: 'codorniz',
+        sexo: 'hembra',
+        proposito: 'huevos',
+        fechaNacimiento: haceMeses(3),
+        peso: 0.2,
+      });
+      const ganso = validarRangosBiologicos({
+        tipo: 'oviparo',
+        especie: 'ganso',
+        sexo: 'hembra',
+        proposito: 'huevos',
+        fechaNacimiento: haceMeses(3),
+        peso: 2,
+      });
+
+      expect(codorniz.etapa).toBe('Ave adulta');
+      expect(codorniz.postura).toBe('Edad compatible con postura');
+      expect(ganso.etapa).toBe('Ave en crecimiento');
+      expect(ganso.postura).toMatch(/Prepostura/);
+    });
+
+    test('diferencia peso por sexo y raza comercial y solo emite alertas orientativas', () => {
+      const fechaNacimiento = haceMeses(12);
+      const gallinaLigera = validarRangosBiologicos({
+        tipo: 'oviparo',
+        especie: 'gallina',
+        sexo: 'hembra',
+        proposito: 'huevos',
+        raza: 'Leghorn',
+        fechaNacimiento,
+        peso: 5,
+      });
+      const gallo = validarRangosBiologicos({
+        tipo: 'oviparo',
+        especie: 'gallina',
+        sexo: 'macho',
+        proposito: 'reproduccion',
+        raza: 'Cornish',
+        fechaNacimiento,
+        peso: 5,
+      });
+
+      expect(gallinaLigera.advertencias).toHaveLength(1);
+      expect(gallinaLigera.errorCritico).toBeUndefined();
+      expect(gallo.advertencias).toHaveLength(0);
+    });
+
+    test('calcula etapa y postura aunque todavía no se haya registrado el peso', () => {
+      const resultado = validarRangosBiologicos({
+        tipo: 'oviparo',
+        especie: 'gallina',
+        sexo: 'hembra',
+        proposito: 'huevos',
+        fechaNacimiento: haceMeses(3),
+      });
+
+      expect(resultado.etapa).toBe('Ave en crecimiento');
+      expect(resultado.postura).toMatch(/Prepostura/);
+      expect(resultado.advertencias).toHaveLength(0);
     });
   });
 

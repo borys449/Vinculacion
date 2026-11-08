@@ -7,24 +7,24 @@ const validarCedulaEcuatoriana = (cedula) => {
   // Debe tener exactamente 10 dígitos numéricos
   if (!/^\d{10}$/.test(cedula)) return false;
 
-  const provincia = parseInt(cedula.substring(0, 2), 10);
+  const provincia = Number.parseInt(cedula.substring(0, 2), 10);
   // Provincias válidas en Ecuador: 1 a 24, o 30 para ecuatorianos en el exterior
   if ((provincia < 1 || provincia > 24) && provincia !== 30) {
     return false;
   }
 
-  const tercerDigito = parseInt(cedula.charAt(2), 10);
+  const tercerDigito = Number.parseInt(cedula.charAt(2), 10);
   // El tercer dígito para cédulas de personas naturales debe ser menor a 6
   if (tercerDigito >= 6) {
     return false;
   }
 
   const coeficientes = [2, 1, 2, 1, 2, 1, 2, 1, 2];
-  const digitoVerificador = parseInt(cedula.charAt(9), 10);
+  const digitoVerificador = Number.parseInt(cedula.charAt(9), 10);
   let suma = 0;
 
   for (let i = 0; i < 9; i++) {
-    let valor = parseInt(cedula.charAt(i), 10) * coeficientes[i];
+    let valor = Number.parseInt(cedula.charAt(i), 10) * coeficientes[i];
     if (valor >= 10) {
       valor -= 9;
     }
@@ -95,7 +95,7 @@ exports.validateUsuario = [
   body('telefono')
     .notEmpty()
     .withMessage('El teléfono es requerido')
-    .matches(/^[0-9]{10}$/)
+    .matches(/^\d{10}$/)
     .withMessage('Teléfono inválido, debe contener 10 dígitos'),
 
   body('area')
@@ -239,6 +239,7 @@ const validateGanadoCommon = [
       'ovino',
       'caprino',
       'avicola',
+      'oviparo',
       'otro',
     ])
     .withMessage('Tipo de ganado inválido'),
@@ -250,8 +251,34 @@ const validateGanadoCommon = [
 
   body('proposito')
     .optional({ checkFalsy: true })
-    .isIn(['leche', 'carne', 'doble_proposito', 'reproduccion'])
-    .withMessage('Propósito inválido. Debe ser leche, carne, doble_proposito o reproduccion'),
+    .isIn(['leche', 'huevos', 'carne', 'doble_proposito', 'reproduccion'])
+    .withMessage('Propósito inválido'),
+
+  body('especie')
+    .if(body('tipo').equals('oviparo'))
+    .isIn(['gallina', 'pato', 'pavo', 'codorniz', 'ganso'])
+    .withMessage('Seleccione una especie de ave válida'),
+
+  body('proposito')
+    .if(body('tipo').equals('oviparo'))
+    .custom((proposito, { req }) => {
+      const opciones = {
+        gallina: ['huevos', 'carne', 'doble_proposito', 'reproduccion'],
+        pato: ['huevos', 'carne', 'doble_proposito'],
+        pavo: ['carne', 'reproduccion'],
+        codorniz: ['huevos', 'carne', 'reproduccion'],
+        ganso: ['huevos', 'carne', 'doble_proposito'],
+      };
+      if (!opciones[req.body.especie]?.includes(proposito)) {
+        throw new Error('El propósito productivo no corresponde a la especie seleccionada');
+      }
+      return true;
+    }),
+
+  body('raza')
+    .if(body('tipo').equals('oviparo'))
+    .notEmpty()
+    .withMessage('Seleccione una raza o indique Criollo / Mestizo'),
 
   body('produccionEstimadaDiaria')
     .optional({ checkFalsy: true })

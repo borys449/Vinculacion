@@ -3,20 +3,25 @@ import api from '@/lib/axios';
 export interface Ganado {
   id: number;
   identificacion: string;
-  tipo: 'bovino' | 'porcino' | 'ovino' | 'caprino' | 'avicola' | 'otro';
+  tipo: 'bovino' | 'porcino' | 'ovino' | 'caprino' | 'avicola' | 'oviparo' | 'otro';
+  especie?: 'gallina' | 'pato' | 'pavo' | 'codorniz' | 'ganso' | null;
   raza?: string | null;
-  proposito?: 'leche' | 'carne' | 'doble_proposito' | 'reproduccion' | null;
+  proposito?: 'leche' | 'huevos' | 'carne' | 'doble_proposito' | 'reproduccion' | null;
   produccionEstimadaDiaria?: number | null;
   fechaNacimiento: string;
   sexo: 'macho' | 'hembra';
   pesoInicial?: number | null;
   pesoActual?: number | null;
-  estadoSalud: 'excelente' | 'bueno' | 'regular' | 'enfermo';
+  estadoSalud: 'sano' | 'en_recuperacion' | 'enfermo';
   estado: 'activo' | 'inactivo' | 'vendido' | 'enfermo' | 'gestacion' | 'fallecido';
   observaciones?: string | null;
   foto?: string | null;
   responsableId: number;
-  responsable?: any;
+  responsable?: {
+    id: number;
+    nombre: string;
+    email?: string;
+  } | null;
   activo: boolean;
   fechaRegistro: string;
   produccionLechera?: ProduccionLecheraStats;
@@ -42,7 +47,15 @@ export interface ProduccionLecheraStats {
   promedioDiarioCalculado: number;
   totalMensualCalculado: number;
   proyeccionMensual: number;
-  registrosMes?: any[];
+  registrosMes?: RegistroLechero[];
+}
+
+export interface RegistroLechero {
+  id: number;
+  fecha: string;
+  cantidad: number;
+  descripcion?: string | null;
+  observaciones?: string | null;
 }
 
 export interface ResumenControlLechero {
@@ -51,7 +64,7 @@ export interface ResumenControlLechero {
   totalMes: number;
   totalBovinos: number;
   bovinosConRegistros: number;
-  ultimosRegistros: any[];
+  ultimosRegistros: RegistroLechero[];
   detallesPorAnimal: ProduccionLecheraStats[];
 }
 
@@ -60,26 +73,34 @@ export type GanadoFormData = Omit<
   'id' | 'responsableId' | 'responsable' | 'fechaRegistro' | 'produccionLechera' | 'evaluacionBiologica'
 >;
 
+interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  count?: number;
+  message?: string;
+  advertenciasBiologicas?: string[];
+}
+
 export const ganadoService = {
   getAll: async (params?: { search?: string; estado?: string; tipo?: string; proposito?: string }) => {
-    const response = await api.get('/ganado', { params });
+    const response = await api.get<ApiResponse<Ganado[]>>('/ganado', { params });
     return response.data;
   },
 
   getById: async (id: number) => {
-    const response = await api.get(`/ganado/${id}`);
+    const response = await api.get<ApiResponse<Ganado>>(`/ganado/${id}`);
     return response.data;
   },
 
   create: async (data: GanadoFormData, foto?: File | null) => {
     const body = foto ? createAnimalFormData(data, foto) : data;
-    const response = await api.post('/ganado', body, foto ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined);
+    const response = await api.post<ApiResponse<Ganado>>('/ganado', body, foto ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined);
     return response.data;
   },
 
   update: async (id: number, data: Partial<GanadoFormData>, foto?: File | null) => {
     const body = foto ? createAnimalFormData(data, foto) : data;
-    const response = await api.put(`/ganado/${id}`, body, foto ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined);
+    const response = await api.put<ApiResponse<Ganado>>(`/ganado/${id}`, body, foto ? { headers: { 'Content-Type': 'multipart/form-data' } } : undefined);
     return response.data;
   },
 
@@ -94,12 +115,12 @@ export const ganadoService = {
   },
 
   getControlLechero: async (id: number) => {
-    const response = await api.get(`/ganado/${id}/control-lechero`);
+    const response = await api.get<ApiResponse<ProduccionLecheraStats>>(`/ganado/${id}/control-lechero`);
     return response.data;
   },
 
   getResumenControlLechero: async () => {
-    const response = await api.get('/ganado/control-lechero/resumen');
+    const response = await api.get<ApiResponse<ResumenControlLechero>>('/ganado/control-lechero/resumen');
     return response.data;
   },
 
