@@ -102,7 +102,9 @@ const PORT = process.env.PORT || 3000;
 if (process.env.NODE_ENV !== 'test') {
   if (require.main === module) {
     assertJwtSecretConfigured();
-    connectDB();
+    void connectDB().catch((error) => {
+      console.error('Error al conectar con la base de datos:', error);
+    });
 
     app.listen(PORT, async () => {
       console.log(`Servidor corriendo en puerto ${PORT}`);
