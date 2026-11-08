@@ -27,7 +27,7 @@ const matchesImageSignature = (file) => {
   }
 };
 
-module.exports = (req, res, next) => {
+function animalPhotoUpload(req, res, next) {
   upload.single('foto')(req, res, (error) => {
     if (error) {
       const status = error.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
@@ -48,7 +48,10 @@ module.exports = (req, res, next) => {
           throw new Error('Los datos del animal deben ser un objeto');
         }
         req.body = data;
-      } catch (parseError) {
+      } catch (error) {
+        if (!(error instanceof SyntaxError)) {
+          return next(error);
+        }
         return res.status(400).json({
           success: false,
           message: 'No se pudieron leer los datos del animal enviados',
@@ -58,4 +61,6 @@ module.exports = (req, res, next) => {
 
     next();
   });
-};
+}
+
+module.exports = animalPhotoUpload;

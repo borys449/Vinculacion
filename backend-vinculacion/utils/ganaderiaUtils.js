@@ -1,6 +1,7 @@
 /**
  * Utilidades para Lógica de Negocio de Ganadería y Control Lechero
  */
+const { validarRangosOviparo } = require('./oviparosUtils');
 
 /**
  * Calcula la edad en meses a partir de la fecha de nacimiento
@@ -11,7 +12,7 @@
 function calcularEdadEnMeses(fechaNacimiento, fechaReferencia = new Date()) {
   if (!fechaNacimiento) return null;
   const nacimiento = new Date(fechaNacimiento);
-  if (isNaN(nacimiento.getTime())) return null;
+  if (Number.isNaN(nacimiento.getTime())) return null;
 
   let meses = (fechaReferencia.getFullYear() - nacimiento.getFullYear()) * 12 + 
               (fechaReferencia.getMonth() - nacimiento.getMonth());
@@ -39,19 +40,38 @@ function calcularEdadEnMeses(fechaNacimiento, fechaReferencia = new Date()) {
  * @param {number|string} params.peso
  * @returns {{ edadMeses: number|null, advertencias: string[], errorCritico?: boolean }}
  */
-function validarRangosBiologicos({ tipo, fechaNacimiento, peso }) {
+function validarRangosBiologicos({ tipo, especie, sexo, proposito, raza, fechaNacimiento, peso }) {
   const advertencias = [];
-  if (peso === undefined || peso === null || isNaN(parseFloat(peso))) {
+  const tipoNormalizado = tipo ? tipo.toLowerCase().trim() : '';
+
+  if (tipoNormalizado === 'oviparo') {
+    const pesoNum = peso === undefined || peso === null || Number.isNaN(Number.parseFloat(peso))
+      ? undefined
+      : Number.parseFloat(peso);
+    if (pesoNum !== undefined && pesoNum < 0) {
+      advertencias.push('El peso no puede ser negativo.');
+      return { edadMeses: null, advertencias, errorCritico: true };
+    }
+
+    return validarRangosOviparo({
+      especie,
+      sexo,
+      proposito,
+      raza,
+      edadMeses: calcularEdadEnMeses(fechaNacimiento),
+      pesoNum,
+    });
+  }
+
+  if (peso === undefined || peso === null || Number.isNaN(Number.parseFloat(peso))) {
     return { edadMeses: null, advertencias };
   }
 
-  const pesoNum = parseFloat(peso);
+  const pesoNum = Number.parseFloat(peso);
   if (pesoNum < 0) {
     advertencias.push('El peso no puede ser negativo.');
     return { edadMeses: null, advertencias, errorCritico: true };
   }
-
-  const tipoNormalizado = tipo ? tipo.toLowerCase().trim() : '';
 
   // Aplicable a bovinos y porcinos
   if (tipoNormalizado !== 'bovino' && tipoNormalizado !== 'porcino') {
@@ -178,8 +198,8 @@ function validarRangosBiologicos({ tipo, fechaNacimiento, peso }) {
  * @returns {Object} Estadísticas lecheras calculadas
  */
 function calcularProduccionLechera(animal, registrosMes = [], fechaHoy = new Date()) {
-  const produccionEstimadaDiaria = parseFloat(animal.produccionEstimadaDiaria || 0);
-  const produccionMensualEstimada = parseFloat((produccionEstimadaDiaria * 30).toFixed(2));
+  const produccionEstimadaDiaria = Number.parseFloat(animal.produccionEstimadaDiaria || 0);
+  const produccionMensualEstimada = Number.parseFloat((produccionEstimadaDiaria * 30).toFixed(2));
 
   // Obtener fecha de hoy en formato YYYY-MM-DD
   const hoyStr = fechaHoy.toISOString().split('T')[0];
@@ -190,7 +210,7 @@ function calcularProduccionLechera(animal, registrosMes = [], fechaHoy = new Dat
   let produccionHoy = 0;
 
   for (const reg of registrosMes) {
-    const litros = parseFloat(reg.cantidad || 0);
+    const litros = Number.parseFloat(reg.cantidad || 0);
     const regFechaStr = (reg.fecha instanceof Date ? reg.fecha.toISOString() : String(reg.fecha)).split('T')[0];
     
     diasConRegistroSet.add(regFechaStr);
@@ -211,8 +231,8 @@ function calcularProduccionLechera(animal, registrosMes = [], fechaHoy = new Dat
   let esEstimado = true;
 
   if (tieneRegistros) {
-    promedioDiarioReal = parseFloat((sumaLitrosMesActual / diasConRegistro).toFixed(2));
-    totalMensualReal = parseFloat(sumaLitrosMesActual.toFixed(2));
+    promedioDiarioReal = Number.parseFloat((sumaLitrosMesActual / diasConRegistro).toFixed(2));
+    totalMensualReal = Number.parseFloat(sumaLitrosMesActual.toFixed(2));
     promedioDiarioCalculado = promedioDiarioReal;
     totalMensualCalculado = totalMensualReal;
     esEstimado = false;
@@ -228,12 +248,12 @@ function calcularProduccionLechera(animal, registrosMes = [], fechaHoy = new Dat
     tieneRegistros,
     esEstimado,
     diasConRegistro,
-    produccionHoy: parseFloat(produccionHoy.toFixed(2)),
+    produccionHoy: Number.parseFloat(produccionHoy.toFixed(2)),
     promedioDiarioReal,
     totalMensualReal,
     promedioDiarioCalculado,
     totalMensualCalculado,
-    proyeccionMensual: parseFloat((promedioDiarioCalculado * 30).toFixed(2)),
+    proyeccionMensual: Number.parseFloat((promedioDiarioCalculado * 30).toFixed(2)),
   };
 }
 
