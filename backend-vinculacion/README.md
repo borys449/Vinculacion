@@ -7,6 +7,7 @@ Sistema web completo para la gestión de registros del sector agropecuario, desa
 - **Autenticación de Usuarios**: Sistema de login y registro con roles (Trabajador/Administrador)
 - **Gestión de Cultivos**: Registro y seguimiento de cultivos
 - **Gestión de Ganado**: Control de inventario animal
+- **Fotos de Ganado**: Carga JPG, PNG o WebP (máximo 5 MB) al crear o editar un animal; se visualiza en su detalle
 - **Sistema de Registros**: Registro de actividades y operaciones agropecuarias
 - **Áreas de Trabajo**: Cultivos, Ganadería, Mantenimiento, Administración, Investigación
 
@@ -98,6 +99,8 @@ Proyecto-Vinculacion/
 ```
 
 ## 🔌 API Endpoints
+
+Las fotos se guardan en `uploads/animals` (o en `ANIMAL_UPLOAD_DIR` si se configura) y la base de datos conserva el nombre del archivo. Si ejecutas el backend dentro de un contenedor, monta un volumen persistente en `/app/uploads` para conservar las imágenes al reemplazarlo. La ruta de lectura de fotos requiere autenticación.
 
 ### Autenticación
 

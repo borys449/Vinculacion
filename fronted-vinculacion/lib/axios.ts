@@ -1,8 +1,16 @@
 import axios from 'axios';
 
+const getApiBaseUrl = () => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+
+  const hostname = typeof window === 'undefined' ? 'localhost' : window.location.hostname;
+  return `http://${hostname}:8080/api`;
+};
+
 const api = axios.create({
-  // Apunta directamente al puerto 8080 del backend Express en local
-  baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080/api',
+  baseURL: getApiBaseUrl(),
   withCredentials: true, // 🔒 Crucial para recibir y enviar las cookies HttpOnly
   headers: {
     'Content-Type': 'application/json',

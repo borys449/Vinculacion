@@ -1,6 +1,11 @@
 const { Ganado, Usuario, Registro } = require('../models');
 const { Op } = require('sequelize');
 const {
+  saveAnimalPhoto,
+  getAnimalPhotoPath,
+  deleteAnimalPhoto,
+} = require('../utils/animalPhoto');
+const {
   validarRangosBiologicos,
   calcularProduccionLechera,
   calcularEdadEnMeses,
@@ -79,6 +84,10 @@ exports.obtenerAnimal = async (req, res) => {
     const pesoEval = animal.pesoActual || animal.pesoInicial;
     const evaluacionBiologica = validarRangosBiologicos({
       tipo: animal.tipo,
+      especie: animal.especie,
+      sexo: animal.sexo,
+      proposito: animal.proposito,
+      raza: animal.raza,
       fechaNacimiento: animal.fechaNacimiento,
       peso: pesoEval
     });
@@ -114,12 +123,18 @@ exports.obtenerAnimal = async (req, res) => {
 };
 
 exports.crearAnimal = async (req, res) => {
+  let fotoGuardada;
+  let animalCreado = false;
   try {
     const { tipo, fechaNacimiento, pesoInicial, pesoActual } = req.body;
     const pesoParaValidar = pesoActual !== undefined && pesoActual !== null ? pesoActual : pesoInicial;
 
     const evalBiologica = validarRangosBiologicos({
       tipo,
+      especie: req.body.especie,
+      sexo: req.body.sexo,
+      proposito: req.body.proposito,
+      raza: req.body.raza,
       fechaNacimiento,
       peso: pesoParaValidar
     });
@@ -131,10 +146,16 @@ exports.crearAnimal = async (req, res) => {
       });
     }
 
+    if (req.file) {
+      fotoGuardada = await saveAnimalPhoto(req.file);
+    }
+
     const animal = await Ganado.create({
       ...req.body,
+      ...(fotoGuardada ? { foto: fotoGuardada } : {}),
       responsableId: req.usuario.id
     });
+    animalCreado = true;
 
     await Registro.create({
       tipo: 'ganado',
@@ -152,6 +173,9 @@ exports.crearAnimal = async (req, res) => {
       data: animal
     });
   } catch (error) {
+    if (fotoGuardada && !animalCreado) {
+      await deleteAnimalPhoto(fotoGuardada);
+    }
     res.status(400).json({
       success: false,
       message: error.message
@@ -160,6 +184,8 @@ exports.crearAnimal = async (req, res) => {
 };
 
 exports.actualizarAnimal = async (req, res) => {
+  let fotoGuardada;
+  let fotoPersistida = false;
   try {
     const animal = await Ganado.findByPk(req.params.id);
 
@@ -201,14 +227,15 @@ exports.actualizarAnimal = async (req, res) => {
     });
 
     let datosActualizar = { ...req.body };
+    delete datosActualizar.foto;
 
     if (req.body.estado) {
       datosActualizar.estado = req.body.estado;
     }
 
     if (req.body.pesoActual && animal.pesoInicial) {
-      const pesoActualNum = parseFloat(req.body.pesoActual);
-      const pesoInicialNum = parseFloat(animal.pesoInicial);
+      const pesoActualNum = Number.parseFloat(req.body.pesoActual);
+      const pesoInicialNum = Number.parseFloat(animal.pesoInicial);
 
       if (pesoActualNum < pesoInicialNum * 0.9) {
         datosActualizar.estadoSalud = 'enfermo';
@@ -216,12 +243,23 @@ exports.actualizarAnimal = async (req, res) => {
       }
     }
 
+    const fotoAnterior = animal.foto;
     const tipoAnimal = req.body.tipo || animal.tipo;
     const fechaNacimiento = req.body.fechaNacimiento || animal.fechaNacimiento;
-    const pesoParaValidar = req.body.pesoActual !== undefined ? req.body.pesoActual : (req.body.pesoInicial !== undefined ? req.body.pesoInicial : animal.pesoActual);
+    let pesoParaValidar = animal.pesoActual;
+    if (req.body.pesoInicial !== undefined) {
+      pesoParaValidar = req.body.pesoInicial;
+    }
+    if (req.body.pesoActual !== undefined) {
+      pesoParaValidar = req.body.pesoActual;
+    }
 
     const evalBiologica = validarRangosBiologicos({
       tipo: tipoAnimal,
+      especie: req.body.especie || animal.especie,
+      sexo: req.body.sexo || animal.sexo,
+      proposito: req.body.proposito || animal.proposito,
+      raza: req.body.raza || animal.raza,
       fechaNacimiento,
       peso: pesoParaValidar
     });
@@ -233,8 +271,17 @@ exports.actualizarAnimal = async (req, res) => {
       });
     }
 
+    if (req.file) {
+      fotoGuardada = await saveAnimalPhoto(req.file);
+      datosActualizar.foto = fotoGuardada;
+    }
+
     await animal.update(datosActualizar);
+    fotoPersistida = Boolean(fotoGuardada);
     await animal.reload();
+    if (fotoGuardada && fotoAnterior) {
+      await deleteAnimalPhoto(fotoAnterior);
+    }
 
     const detalleCambio = cambiosRealizados.length > 0 
       ? `Actualizó: ${cambiosRealizados.join(', ')}` 
@@ -256,6 +303,31 @@ exports.actualizarAnimal = async (req, res) => {
       data: animal
     });
   } catch (error) {
+    if (fotoGuardada && !fotoPersistida) {
+      await deleteAnimalPhoto(fotoGuardada);
+    }
+    res.status(400).json({ success: false, message: error.message });
+  }
+};
+
+exports.obtenerFotoAnimal = async (req, res) => {
+  try {
+    const animal = await Ganado.findByPk(req.params.id, { attributes: ['id', 'foto'] });
+    const fotoPath = animal && getAnimalPhotoPath(animal.foto);
+
+    if (!fotoPath) {
+      return res.status(404).json({ success: false, message: 'El animal no tiene foto registrada' });
+    }
+
+    res.sendFile(fotoPath, (error) => {
+      if (error && !res.headersSent) {
+        res.status(error.statusCode || 404).json({
+          success: false,
+          message: error.statusCode === 404 ? 'La foto del animal no está disponible' : 'No se pudo cargar la foto',
+        });
+      }
+    });
+  } catch (error) {
     res.status(400).json({ success: false, message: error.message });
   }
 };
@@ -272,7 +344,11 @@ exports.eliminarAnimal = async (req, res) => {
     }
 
     const ident = animal.identificacion;
+    const foto = animal.foto;
     await animal.destroy();
+    if (foto) {
+      await deleteAnimalPhoto(foto);
+    }
 
     await Registro.create({
       tipo: 'ganado',
@@ -394,15 +470,15 @@ exports.obtenerResumenControlLechero = async (req, res) => {
     }
 
     const promedioDiarioHato = bovinos.length > 0 
-      ? parseFloat((sumaPromediosDiarios / bovinos.length).toFixed(2)) 
+      ? Number.parseFloat((sumaPromediosDiarios / bovinos.length).toFixed(2))
       : 0;
 
     res.status(200).json({
       success: true,
       data: {
-        produccionHoy: parseFloat(produccionTotalHoy.toFixed(2)),
+        produccionHoy: Number.parseFloat(produccionTotalHoy.toFixed(2)),
         promedioDiario: promedioDiarioHato,
-        totalMes: parseFloat(totalAcumuladoMes.toFixed(2)),
+        totalMes: Number.parseFloat(totalAcumuladoMes.toFixed(2)),
         totalBovinos: bovinos.length,
         bovinosConRegistros: Object.keys(registrosPorAnimal).length,
         ultimosRegistros: registrosLecheMes.slice(0, 15),
@@ -430,8 +506,8 @@ exports.registrarOrdenio = async (req, res) => {
 
     const { cantidad, fecha, observaciones, sesion } = req.body;
 
-    const litros = parseFloat(cantidad);
-    if (isNaN(litros) || litros <= 0) {
+    const litros = Number.parseFloat(cantidad);
+    if (Number.isNaN(litros) || litros <= 0) {
       return res.status(400).json({
         success: false,
         message: 'La cantidad de leche en litros debe ser un número mayor a cero'

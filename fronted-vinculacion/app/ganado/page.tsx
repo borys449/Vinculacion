@@ -2,8 +2,10 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+import { isAxiosError } from 'axios';
 import { useAuth } from '@/context/AuthContext';
-import { useForm, SubmitHandler } from 'react-hook-form';
+import { useForm, useWatch, SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import DashboardLayout from '@/components/layout/DashboardLayout';
@@ -16,7 +18,9 @@ import { ganadoSchema, GanadoSchemaType } from '@/schemas/ganadoSchema';
 import {
   ganadoService,
   Ganado,
+  GanadoFormData,
   ProduccionLecheraStats,
+  RegistroLechero,
   ResumenControlLechero,
 } from '@/services/ganado.service';
 import {
@@ -26,6 +30,21 @@ import {
   validarPesoEdadBovino,
   PropositoBovino,
 } from '@/constants/bovinos';
+import {
+  PROPOSITOS_PORCINO,
+  RAZAS_POR_PROPOSITO_PORCINO,
+  TODAS_LAS_RAZAS_PORCINAS,
+  validarPesoEdadPorcino,
+  PropositoPorcino,
+} from '@/constants/porcinos';
+import {
+  ESPECIES_OVIPARAS,
+  PROPOSITOS_POR_ESPECIE,
+  RAZAS_POR_ESPECIE_Y_PROPOSITO,
+  validarPesoEdadOviparo,
+  EspecieOvipara,
+  PropositoOviparo,
+} from '@/constants/oviparos';
 import {
   FiPlus,
   FiEdit,
@@ -37,10 +56,18 @@ import {
   FiCalendar,
   FiCheckCircle,
   FiInfo,
+  FiEye,
 } from 'react-icons/fi';
 import { GiCow, GiMilkCarton } from 'react-icons/gi';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import toast from 'react-hot-toast';
+
+function getErrorMessage(error: unknown): string {
+  if (isAxiosError<{ message?: string }>(error)) {
+    return error.response?.data?.message || error.message;
+  }
+  return error instanceof Error ? error.message : 'Error desconocido';
+}
 
 export default function GanadoPage() {
   const { user, loading: authLoading } = useAuth();
@@ -71,6 +98,75 @@ export default function GanadoPage() {
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAnimal, setEditingAnimal] = useState<Ganado | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<File | null>(null);
+  const [animalDetail, setAnimalDetail] = useState<Ganado | null>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [detailPhotoUrl, setDetailPhotoUrl] = useState<string | null>(null);
+  const [editingPhotoUrl, setEditingPhotoUrl] = useState<string | null>(null);
+  const [detailPhotoLoading, setDetailPhotoLoading] = useState(false);
+  const photoPreviewUrl = useMemo(
+    () => (selectedPhoto ? URL.createObjectURL(selectedPhoto) : null),
+    [selectedPhoto]
+  );
+
+  useEffect(() => {
+    return () => {
+      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl);
+    };
+  }, [photoPreviewUrl]);
+
+  useEffect(() => {
+    if (!modalOpen || !editingAnimal?.foto) {
+      return;
+    }
+
+    let active = true;
+    let objectUrl: string | null = null;
+    ganadoService.getPhoto(editingAnimal.id)
+      .then((blob) => {
+        if (active) {
+          objectUrl = URL.createObjectURL(blob);
+          setEditingPhotoUrl(objectUrl);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('Error loading animal photo for editing:', error);
+        if (active) setEditingPhotoUrl(null);
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [modalOpen, editingAnimal?.id, editingAnimal?.foto]);
+
+  useEffect(() => {
+    if (!detailModalOpen || !animalDetail?.foto) {
+      return;
+    }
+
+    let active = true;
+    let objectUrl: string | null = null;
+    ganadoService.getPhoto(animalDetail.id)
+      .then((blob) => {
+        if (active) {
+          objectUrl = URL.createObjectURL(blob);
+          setDetailPhotoUrl(objectUrl);
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('Error loading animal photo:', error);
+        if (active) setDetailPhotoUrl(null);
+      })
+      .finally(() => {
+        if (active) setDetailPhotoLoading(false);
+      });
+
+    return () => {
+      active = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [detailModalOpen, animalDetail?.id, animalDetail?.foto]);
 
   // Estados para búsqueda y filtrado de inventario
   const [searchTerm, setSearchTerm] = useState('');
@@ -79,9 +175,8 @@ export default function GanadoPage() {
 
   // Estados para Control Lechero
   const [resumenLechero, setResumenLechero] = useState<ResumenControlLechero | null>(null);
-  const [loadingLechero, setLoadingLechero] = useState(false);
   const [selectedBovinoId, setSelectedBovinoId] = useState<number | null>(null);
-  const [perfilLecheroVaca, setPerfilLecheroVaca] = useState<ProduccionLecheraStats | null>(null);
+  const [perfilLecheroVacaRaw, setPerfilLecheroVacaRaw] = useState<ProduccionLecheraStats | null>(null);
   const [ordenioModalOpen, setOrdenioModalOpen] = useState(false);
   const [ordenioBovinoId, setOrdenioBovinoId] = useState<number | ''>('');
   const [ordenioCantidad, setOrdenioCantidad] = useState<string>('');
@@ -95,7 +190,7 @@ export default function GanadoPage() {
     register,
     handleSubmit,
     reset,
-    watch,
+    control,
     setValue,
     formState: { errors },
   } = useForm<GanadoSchemaType>({
@@ -103,6 +198,7 @@ export default function GanadoPage() {
     defaultValues: {
       identificacion: '',
       tipo: 'bovino',
+      especie: '',
       raza: '',
       proposito: 'leche',
       produccionEstimadaDiaria: 0,
@@ -118,37 +214,73 @@ export default function GanadoPage() {
   });
 
   // Watchers para lógica reactiva del formulario
-  const watchTipo = watch('tipo');
-  const watchProposito = watch('proposito') as PropositoBovino | undefined;
-  const watchFechaNacimiento = watch('fechaNacimiento');
-  const watchPesoActual = watch('pesoActual');
-  const watchPesoInicial = watch('pesoInicial');
+  const watchTipo = useWatch({ control, name: 'tipo' });
+  const watchEspecie = useWatch({ control, name: 'especie' });
+  const watchProposito = useWatch({ control, name: 'proposito' });
+  const watchRaza = useWatch({ control, name: 'raza' });
+  const watchFechaNacimiento = useWatch({ control, name: 'fechaNacimiento' });
+  const watchSexo = useWatch({ control, name: 'sexo' });
+  const watchPesoActual = useWatch({ control, name: 'pesoActual' });
+  const watchPesoInicial = useWatch({ control, name: 'pesoInicial' });
 
   // Opciones de raza dinámicas filtradas por propósito
   const opcionesRaza = useMemo(() => {
-    if (watchTipo === 'bovino' && watchProposito && RAZAS_POR_PROPOSITO[watchProposito]) {
-      return RAZAS_POR_PROPOSITO[watchProposito];
-    }
     if (watchTipo === 'bovino') {
+      if (watchProposito && RAZAS_POR_PROPOSITO[watchProposito as PropositoBovino]) {
+        return RAZAS_POR_PROPOSITO[watchProposito as PropositoBovino];
+      }
       return TODAS_LAS_RAZAS_BOVINAS;
     }
+    if (watchTipo === 'porcino') {
+      if (watchProposito && RAZAS_POR_PROPOSITO_PORCINO[watchProposito as PropositoPorcino]) {
+        return RAZAS_POR_PROPOSITO_PORCINO[watchProposito as PropositoPorcino];
+      }
+      return TODAS_LAS_RAZAS_PORCINAS;
+    }
+    if (watchTipo === 'oviparo' && watchEspecie && watchProposito) {
+      return RAZAS_POR_ESPECIE_Y_PROPOSITO[watchEspecie as EspecieOvipara][
+        watchProposito as PropositoOviparo
+      ] || [];
+    }
     return [];
-  }, [watchTipo, watchProposito]);
+  }, [watchTipo, watchEspecie, watchProposito]);
 
   // Validación biológica en tiempo real (Edad vs. Peso)
   const evaluacionBiologicaForm = useMemo(() => {
-    if (watchTipo !== 'bovino' || !watchFechaNacimiento) {
-      return { edadMeses: null, alertas: [] };
+    if (!watchFechaNacimiento) {
+      return { edadMeses: null, etapa: '', alertas: [] };
     }
-    const pesoAValidar =
-      watchPesoActual && watchPesoActual > 0
-        ? watchPesoActual
-        : watchPesoInicial && watchPesoInicial > 0
-        ? watchPesoInicial
-        : null;
+    let pesoAValidar: number | null = null;
+    if (watchPesoActual && watchPesoActual > 0) {
+      pesoAValidar = watchPesoActual;
+    } else if (watchPesoInicial && watchPesoInicial > 0) {
+      pesoAValidar = watchPesoInicial;
+    }
 
-    return validarPesoEdadBovino(watchFechaNacimiento, pesoAValidar);
-  }, [watchTipo, watchFechaNacimiento, watchPesoActual, watchPesoInicial]);
+    if (watchTipo === 'bovino') {
+      const res = validarPesoEdadBovino(watchFechaNacimiento, pesoAValidar);
+      return { edadMeses: res.edadMeses, etapa: 'Bovino', alertas: res.alertas };
+    }
+
+    if (watchTipo === 'porcino') {
+      const res = validarPesoEdadPorcino(watchFechaNacimiento, pesoAValidar);
+      return { edadMeses: res.edadMeses, etapa: res.etapa, alertas: res.alertas };
+    }
+
+    if (watchTipo === 'oviparo' && watchEspecie) {
+      const res = validarPesoEdadOviparo({
+        especie: watchEspecie as EspecieOvipara,
+        fechaNacimiento: watchFechaNacimiento,
+        sexo: watchSexo,
+        peso: pesoAValidar,
+        proposito: watchProposito as PropositoOviparo,
+        raza: watchRaza,
+      });
+      return { edadMeses: res.edadMeses, etapa: res.etapa, postura: res.postura, alertas: res.alertas };
+    }
+
+    return { edadMeses: null, etapa: '', alertas: [] };
+  }, [watchTipo, watchEspecie, watchProposito, watchRaza, watchSexo, watchFechaNacimiento, watchPesoActual, watchPesoInicial]);
 
   // Cargar inventario de ganado
   const fetchGanado = async () => {
@@ -167,7 +299,6 @@ export default function GanadoPage() {
 
   // Cargar resumen de control lechero
   const fetchControlLechero = async () => {
-    setLoadingLechero(true);
     try {
       const response = await ganadoService.getResumenControlLechero();
       if (response.success) {
@@ -175,8 +306,6 @@ export default function GanadoPage() {
       }
     } catch (error) {
       console.error('Error fetching resumen lechero:', error);
-    } finally {
-      setLoadingLechero(false);
     }
   };
 
@@ -185,7 +314,7 @@ export default function GanadoPage() {
     try {
       const response = await ganadoService.getControlLechero(id);
       if (response.success) {
-        setPerfilLecheroVaca(response.data);
+        setPerfilLecheroVacaRaw(response.data);
       }
     } catch (error) {
       console.error('Error fetching perfil vaca:', error);
@@ -194,17 +323,17 @@ export default function GanadoPage() {
 
   useEffect(() => {
     if (!authLoading && user && (user.tipo === 'administrador' || user.area === 'ganaderia')) {
-      fetchGanado();
-      fetchControlLechero();
+      // These effects fetch remote data; their state updates occur after the requests resolve.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void fetchGanado();
+      void fetchControlLechero();
     }
   }, [authLoading, user]);
 
   useEffect(() => {
-    if (selectedBovinoId) {
-      fetchPerfilVaca(selectedBovinoId);
-    } else {
-      setPerfilLecheroVaca(null);
-    }
+    // The profile state is updated asynchronously when the API request completes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (selectedBovinoId) void fetchPerfilVaca(selectedBovinoId);
   }, [selectedBovinoId]);
 
   // Lista de solo bovinos para el control lechero
@@ -212,12 +341,15 @@ export default function GanadoPage() {
     return ganado.filter((g) => g.tipo === 'bovino');
   }, [ganado]);
 
-  // Si cambia a la pestaña de leche y no hay vaca seleccionada, seleccionar la primera por defecto
-  useEffect(() => {
-    if (activeTab === 'leche' && !selectedBovinoId && bovinosList.length > 0) {
+  const perfilLecheroVaca =
+    perfilLecheroVacaRaw?.ganadoId === selectedBovinoId ? perfilLecheroVacaRaw : null;
+
+  const abrirPestanaLechera = () => {
+    setActiveTab('leche');
+    if (!selectedBovinoId && bovinosList.length > 0) {
       setSelectedBovinoId(bovinosList[0].id);
     }
-  }, [activeTab, selectedBovinoId, bovinosList]);
+  };
 
   // Filtrado de inventario
   const filteredGanado = ganado.filter((animal) => {
@@ -234,26 +366,29 @@ export default function GanadoPage() {
 
   const onSubmit: SubmitHandler<GanadoSchemaType> = async (data) => {
     try {
-      const payload: any = {
+      const payload: GanadoFormData = {
         ...data,
         identificacion: data.identificacion.trim(),
         raza: data.raza?.trim() || '',
         observaciones: data.observaciones?.trim() || '',
         pesoInicial: data.pesoInicial || null,
         pesoActual: data.pesoActual || null,
-        proposito: data.tipo === 'bovino' ? data.proposito || null : null,
+        especie: data.tipo === 'oviparo' ? data.especie || null : null,
+        proposito: (data.tipo === 'bovino' || data.tipo === 'porcino' || data.tipo === 'oviparo')
+          ? data.proposito || null
+          : null,
         produccionEstimadaDiaria:
           data.tipo === 'bovino' ? Number(data.produccionEstimadaDiaria || 0) : 0,
       };
 
       if (editingAnimal) {
-        const res = await ganadoService.update(editingAnimal.id, payload);
+        const res = await ganadoService.update(editingAnimal.id, payload, selectedPhoto);
         toast.success('Animal actualizado exitosamente');
         if (res.advertenciasBiologicas?.length) {
           toast(res.advertenciasBiologicas[0], { icon: '⚠️', duration: 5000 });
         }
       } else {
-        const res = await ganadoService.create(payload);
+        const res = await ganadoService.create(payload, selectedPhoto);
         toast.success('Animal registrado exitosamente');
         if (res.advertenciasBiologicas?.length) {
           toast(res.advertenciasBiologicas[0], { icon: '⚠️', duration: 5000 });
@@ -265,9 +400,9 @@ export default function GanadoPage() {
         await fetchPerfilVaca(selectedBovinoId);
       }
       handleCloseModal();
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving ganado:', error);
-      toast.error(`Error al guardar: ${error.response?.data?.message || error.message}`);
+      toast.error(`Error al guardar: ${getErrorMessage(error)}`);
     }
   };
 
@@ -276,29 +411,38 @@ export default function GanadoPage() {
       try {
         await ganadoService.delete(id);
         toast.success('Animal eliminado');
-        fetchGanado();
-        fetchControlLechero();
-      } catch (error: any) {
+        void fetchGanado();
+        void fetchControlLechero();
+      } catch (error: unknown) {
         console.error('Error deleting ganado:', error);
-        toast.error(`Error al eliminar: ${error.response?.data?.message || error.message}`);
+        toast.error(`Error al eliminar: ${getErrorMessage(error)}`);
       }
     }
   };
 
   const handleEdit = (animal: Ganado) => {
     setEditingAnimal(animal);
+    setSelectedPhoto(null);
+    setEditingPhotoUrl(null);
+    let proposito: GanadoSchemaType['proposito'] = animal.proposito || '';
+    if (!proposito && animal.tipo === 'bovino') {
+      proposito = 'leche';
+    } else if (!proposito && animal.tipo === 'porcino') {
+      proposito = 'carne';
+    }
     reset({
       identificacion: animal.identificacion,
-      tipo: animal.tipo as any,
+      tipo: animal.tipo,
+      especie: animal.especie || '',
       raza: animal.raza || '',
-      proposito: (animal.proposito as any) || (animal.tipo === 'bovino' ? 'leche' : ''),
+      proposito,
       produccionEstimadaDiaria: animal.produccionEstimadaDiaria || 0,
       fechaNacimiento: animal.fechaNacimiento ? animal.fechaNacimiento.split('T')[0] : '',
-      sexo: animal.sexo as any,
+      sexo: animal.sexo,
       pesoInicial: animal.pesoInicial || 0,
       pesoActual: animal.pesoActual || 0,
-      estadoSalud: animal.estadoSalud as any,
-      estado: animal.estado as any,
+      estadoSalud: animal.estadoSalud,
+      estado: animal.estado,
       observaciones: animal.observaciones || '',
       activo: animal.activo,
     });
@@ -307,9 +451,12 @@ export default function GanadoPage() {
 
   const handleOpenNewModal = () => {
     setEditingAnimal(null);
+    setSelectedPhoto(null);
+    setEditingPhotoUrl(null);
     reset({
       identificacion: `GAN-${Math.floor(100000 + Math.random() * 900000)}`,
       tipo: 'bovino',
+      especie: '',
       raza: 'Holstein Friesian',
       proposito: 'leche',
       produccionEstimadaDiaria: 0,
@@ -328,17 +475,38 @@ export default function GanadoPage() {
   const handleCloseModal = () => {
     setModalOpen(false);
     setEditingAnimal(null);
+    setSelectedPhoto(null);
+    setEditingPhotoUrl(null);
+  };
+
+  const handleViewDetails = async (animal: Ganado) => {
+    try {
+      const response = await ganadoService.getById(animal.id);
+      setAnimalDetail(response.data);
+      setDetailPhotoUrl(null);
+      setDetailPhotoLoading(Boolean(response.data.foto));
+      setDetailModalOpen(true);
+    } catch (error: unknown) {
+      console.error('Error loading animal details:', error);
+      toast.error(`No se pudo cargar el detalle: ${getErrorMessage(error)}`);
+    }
+  };
+
+  const handleCloseDetails = () => {
+    setDetailModalOpen(false);
+    setDetailPhotoUrl(null);
+    setDetailPhotoLoading(false);
   };
 
   // Guardar Ordeño Diario
-  const handleGuardarOrdenio = async (e: React.FormEvent) => {
+  const handleGuardarOrdenio = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!ordenioBovinoId) {
       toast.error('Seleccione un bovino para registrar el ordeño');
       return;
     }
-    const litrosNum = parseFloat(ordenioCantidad);
-    if (isNaN(litrosNum) || litrosNum <= 0) {
+    const litrosNum = Number.parseFloat(ordenioCantidad);
+    if (Number.isNaN(litrosNum) || litrosNum <= 0) {
       toast.error('Ingrese una cantidad válida de litros mayor a cero');
       return;
     }
@@ -362,9 +530,9 @@ export default function GanadoPage() {
       if (selectedBovinoId) {
         await fetchPerfilVaca(selectedBovinoId);
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error registrando ordeño:', error);
-      toast.error(`Error al registrar ordeño: ${error.response?.data?.message || error.message}`);
+      toast.error(`Error al registrar ordeño: ${getErrorMessage(error)}`);
     } finally {
       setGuardandoOrdenio(false);
     }
@@ -400,10 +568,15 @@ export default function GanadoPage() {
 
   const propositoBadges: Record<string, { label: string; class: string }> = {
     leche: { label: 'Leche', class: 'bg-cyan-100 text-cyan-800 border-cyan-200' },
+    huevos: { label: 'Huevos', class: 'bg-yellow-100 text-yellow-800 border-yellow-200' },
     carne: { label: 'Carne', class: 'bg-amber-100 text-amber-800 border-amber-200' },
     doble_proposito: {
       label: 'Doble Propósito',
       class: 'bg-purple-100 text-purple-800 border-purple-200',
+    },
+    reproduccion: {
+      label: 'Reproducción',
+      class: 'bg-emerald-100 text-emerald-800 border-emerald-200',
     },
   };
 
@@ -412,13 +585,23 @@ export default function GanadoPage() {
     {
       key: 'tipo',
       label: 'Tipo',
-      render: (value: string) => value.charAt(0).toUpperCase() + value.slice(1),
+      render: (value: string) => {
+        if (value === 'oviparo') return 'Ovíparo';
+        if (value === 'avicola') return 'Avícola';
+        return value.charAt(0).toUpperCase() + value.slice(1);
+      },
+    },
+    {
+      key: 'especie',
+      label: 'Especie',
+      render: (value?: string) =>
+        ESPECIES_OVIPARAS.find((especie) => especie.value === value)?.label || '-',
     },
     {
       key: 'proposito',
       label: 'Propósito',
       render: (value: string, row: Ganado) => {
-        if (row.tipo !== 'bovino' || !value) return <span className="text-gray-400 text-xs">-</span>;
+        if ((row.tipo !== 'bovino' && row.tipo !== 'porcino') || !value) return <span className="text-gray-400 text-xs">-</span>;
         const config = propositoBadges[value] || { label: value, class: 'bg-gray-100 text-gray-800' };
         return (
           <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${config.class}`}>
@@ -490,19 +673,23 @@ export default function GanadoPage() {
       label: 'Nacimiento',
       render: (value: string) => {
         if (!value) return 'N/A';
-        try {
-          const fechaSegura = new Date(value.replace(/-/g, '/'));
-          return format(fechaSegura, 'dd/MM/yyyy');
-        } catch (error) {
-          return value;
-        }
+        const fechaSegura = new Date(value.replace(/-/g, '/'));
+        return isValid(fechaSegura) ? format(fechaSegura, 'dd/MM/yyyy') : value;
       },
     },
     {
       key: 'acciones',
       label: 'Acciones',
-      render: (_: any, row: Ganado) => (
+      render: (_value: unknown, row: Ganado) => (
         <div className="flex items-center space-x-2">
+          <button
+            onClick={() => handleViewDetails(row)}
+            className="p-1.5 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md transition-colors"
+            title="Ver detalle"
+            aria-label={`Ver detalle de ${row.identificacion}`}
+          >
+            <FiEye className="h-4 w-4" />
+          </button>
           {row.tipo === 'bovino' && (
             <button
               onClick={() => irAControlLecheroVaca(row.id)}
@@ -530,6 +717,38 @@ export default function GanadoPage() {
       ),
     },
   ];
+
+  let detailPhotoContent;
+  if (detailPhotoLoading) {
+    detailPhotoContent = (
+      <div className="flex h-40 items-center justify-center rounded-xl bg-gray-50 text-gray-500">
+        Cargando foto...
+      </div>
+    );
+  } else if (detailPhotoUrl && animalDetail) {
+    detailPhotoContent = (
+      <Image
+        unoptimized
+        width={800}
+        height={512}
+        src={detailPhotoUrl}
+        alt={`Foto de ${animalDetail.identificacion}`}
+        className="h-64 w-full rounded-xl bg-gray-50 object-contain"
+      />
+    );
+  } else if (animalDetail?.foto) {
+    detailPhotoContent = (
+      <div className="flex h-40 items-center justify-center rounded-xl bg-gray-50 text-gray-500">
+        No se pudo cargar la foto del animal.
+      </div>
+    );
+  } else {
+    detailPhotoContent = (
+      <div className="flex h-40 items-center justify-center rounded-xl bg-gray-50 text-gray-500">
+        Este animal todavía no tiene foto.
+      </div>
+    );
+  }
 
   // Pantalla de carga mientras valida permisos
   if (authLoading || (!user || (user.tipo !== 'administrador' && user.area !== 'ganaderia'))) {
@@ -560,7 +779,7 @@ export default function GanadoPage() {
               </button>
 
               <button
-                onClick={() => setActiveTab('leche')}
+                onClick={abrirPestanaLechera}
                 className={`flex items-center px-4 py-2.5 text-sm font-semibold rounded-lg transition-all ${
                   activeTab === 'leche'
                     ? 'bg-cyan-600 text-white shadow-sm'
@@ -624,9 +843,11 @@ export default function GanadoPage() {
                     className="bg-white border border-gray-300 rounded-lg text-sm text-gray-900 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-green-500 cursor-pointer"
                   >
                     <option value="todos">Todos los Propósitos</option>
-                    <option value="leche">Leche</option>
+                    <option value="leche">Leche (Bovinos)</option>
+                    <option value="huevos">Huevos (Ovíparos)</option>
                     <option value="carne">Carne</option>
                     <option value="doble_proposito">Doble Propósito</option>
+                    <option value="reproduccion">Reproducción</option>
                   </select>
 
                   <select
@@ -895,7 +1116,7 @@ export default function GanadoPage() {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-100 bg-white">
-                              {perfilLecheroVaca.registrosMes.map((reg: any) => (
+                              {perfilLecheroVaca.registrosMes.map((reg: RegistroLechero) => (
                                 <tr key={reg.id} className="hover:bg-cyan-50/50">
                                   <td className="px-4 py-2.5 font-medium text-gray-900">
                                     {format(new Date(reg.fecha), 'dd/MM/yyyy')}
@@ -966,12 +1187,42 @@ export default function GanadoPage() {
                   options={[
                     { value: 'bovino', label: 'Bovino (Ganado Vacuno)' },
                     { value: 'porcino', label: 'Porcino (Cerdos)' },
+                    { value: 'oviparo', label: 'Ovíparo (Aves de corral)' },
                     { value: 'ovino', label: 'Ovino (Ovejas)' },
                     { value: 'caprino', label: 'Caprino (Cabras)' },
-                    { value: 'avicola', label: 'Avícola (Aves)' },
+                    { value: 'avicola', label: 'Avícola (registro anterior)' },
                     { value: 'otro', label: 'Otro' },
                   ]}
                   {...register('tipo')}
+                  onChange={(e) => {
+                    const nuevoTipo = e.target.value as GanadoSchemaType['tipo'];
+                    setValue('tipo', nuevoTipo);
+                    if (nuevoTipo === 'bovino') {
+                      setValue('especie', '');
+                      setValue('proposito', 'leche');
+                      setValue('raza', RAZAS_POR_PROPOSITO['leche'][0]);
+                    } else if (nuevoTipo === 'porcino') {
+                      setValue('especie', '');
+                      setValue('proposito', 'carne');
+                      setValue('raza', RAZAS_POR_PROPOSITO_PORCINO['carne'][0]);
+                      setValue('produccionEstimadaDiaria', 0);
+                    } else if (nuevoTipo === 'oviparo') {
+                      const especieInicial = 'gallina';
+                      const propositoInicial = 'huevos';
+                      setValue('especie', especieInicial);
+                      setValue('proposito', propositoInicial);
+                      setValue(
+                        'raza',
+                        RAZAS_POR_ESPECIE_Y_PROPOSITO[especieInicial][propositoInicial]?.[0] || 'Criollo / Mestizo'
+                      );
+                      setValue('produccionEstimadaDiaria', 0);
+                    } else {
+                      setValue('especie', '');
+                      setValue('proposito', '');
+                      setValue('raza', '');
+                      setValue('produccionEstimadaDiaria', 0);
+                    }
+                  }}
                   required
                 />
 
@@ -987,10 +1238,14 @@ export default function GanadoPage() {
                       }))}
                       {...register('proposito')}
                       onChange={(e) => {
-                        setValue('proposito', e.target.value as any);
-                        const razas = RAZAS_POR_PROPOSITO[e.target.value as PropositoBovino];
+                        const nuevoProposito = e.target.value as PropositoBovino;
+                        setValue('proposito', nuevoProposito);
+                        const razas = RAZAS_POR_PROPOSITO[nuevoProposito];
                         if (razas && razas.length > 0) {
-                          setValue('raza', razas[0]);
+                          const razaActual = watchRaza;
+                          if (!razaActual || !razas.includes(razaActual)) {
+                            setValue('raza', razas[0]);
+                          }
                         }
                       }}
                       required
@@ -1020,12 +1275,103 @@ export default function GanadoPage() {
                   </>
                 )}
 
-                {watchTipo !== 'bovino' && (
+                {/* Campos específicos de Porcinos: Propósito y Raza filtrada */}
+                {watchTipo === 'porcino' && (
+                  <>
+                    <Select
+                      label="Propósito Productivo (Porcino)"
+                      error={errors.proposito?.message}
+                      options={PROPOSITOS_PORCINO.map((p) => ({
+                        value: p.value,
+                        label: p.label,
+                      }))}
+                      {...register('proposito')}
+                      onChange={(e) => {
+                        const nuevoProposito = e.target.value as PropositoPorcino;
+                        setValue('proposito', nuevoProposito);
+                        const razas = RAZAS_POR_PROPOSITO_PORCINO[nuevoProposito];
+                        if (razas && razas.length > 0) {
+                          const razaActual = watchRaza;
+                          if (!razaActual || !razas.includes(razaActual)) {
+                            setValue('raza', razas[0]);
+                          }
+                        }
+                      }}
+                      required
+                    />
+
+                    <div>
+                      <Select
+                        label="Raza Porcina (Filtrada por Propósito)"
+                        error={errors.raza?.message}
+                        options={opcionesRaza.map((r) => ({
+                          value: r,
+                          label: r,
+                        }))}
+                        {...register('raza')}
+                        required
+                      />
+                    </div>
+                  </>
+                )}
+
+                {watchTipo === 'oviparo' && (
+                  <>
+                    <Select
+                      label="Especie de Ave"
+                      error={errors.especie?.message}
+                      options={ESPECIES_OVIPARAS.map(({ value, label }) => ({ value, label }))}
+                      {...register('especie')}
+                      onChange={(event) => {
+                        const especie = event.target.value as EspecieOvipara;
+                        const proposito = PROPOSITOS_POR_ESPECIE[especie][0].value;
+                        setValue('especie', especie, { shouldValidate: true });
+                        setValue('proposito', proposito, { shouldValidate: true });
+                        setValue(
+                          'raza',
+                          RAZAS_POR_ESPECIE_Y_PROPOSITO[especie][proposito]?.[0] || '',
+                          { shouldValidate: true }
+                        );
+                      }}
+                      required
+                    />
+                    <Select
+                      label="Propósito Productivo"
+                      error={errors.proposito?.message}
+                      options={
+                        watchEspecie
+                          ? PROPOSITOS_POR_ESPECIE[watchEspecie as EspecieOvipara]
+                          : []
+                      }
+                      {...register('proposito')}
+                      onChange={(event) => {
+                        const proposito = event.target.value as PropositoOviparo;
+                        setValue('proposito', proposito, { shouldValidate: true });
+                        const especie = watchEspecie as EspecieOvipara;
+                        setValue(
+                          'raza',
+                          RAZAS_POR_ESPECIE_Y_PROPOSITO[especie][proposito]?.[0] || '',
+                          { shouldValidate: true }
+                        );
+                      }}
+                      required
+                    />
+                    <Select
+                      label="Raza o línea"
+                      error={errors.raza?.message}
+                      options={opcionesRaza.map((raza) => ({ value: raza, label: raza }))}
+                      {...register('raza')}
+                      required
+                    />
+                  </>
+                )}
+
+                {watchTipo !== 'bovino' && watchTipo !== 'porcino' && watchTipo !== 'oviparo' && (
                   <Input
                     label="Raza"
                     error={errors.raza?.message}
                     {...register('raza')}
-                    placeholder="Ej: Landrace, Dorper, etc."
+                    placeholder="Ej: Dorper, Boer, etc."
                     suggestions={Array.from(new Set(ganado.map((g) => g.raza).filter(Boolean) as string[]))}
                     required
                   />
@@ -1093,17 +1439,47 @@ export default function GanadoPage() {
                 />
               </div>
 
+              <div>
+                <label htmlFor="foto-animal" className="block text-sm font-medium text-gray-700 mb-1">
+                  Foto del animal
+                </label>
+                <input
+                  id="foto-animal"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) => setSelectedPhoto(event.target.files?.[0] || null)}
+                  className="block w-full text-sm text-gray-700 file:mr-4 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-4 file:py-2 file:font-semibold file:text-emerald-700 hover:file:bg-emerald-100"
+                />
+                <p className="mt-1 text-xs text-gray-500">JPG, PNG o WebP; máximo 5 MB.</p>
+                {(photoPreviewUrl || editingPhotoUrl) && (
+                  <Image
+                    unoptimized
+                    width={144}
+                    height={144}
+                    src={photoPreviewUrl || editingPhotoUrl!}
+                    alt="Vista previa de la foto del animal"
+                    className="mt-3 h-36 w-36 rounded-lg border border-gray-200 object-cover"
+                  />
+                )}
+              </div>
+
               {/* Alertas Biológicas Interactivas (Edad vs. Peso) */}
-              {evaluacionBiologicaForm.alertas.length > 0 && (
+              {(evaluacionBiologicaForm.alertas.length > 0 ||
+                (watchTipo === 'oviparo' && Boolean(evaluacionBiologicaForm.etapa))) && (
                 <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-r-lg space-y-1">
                   <div className="flex items-center space-x-2 text-amber-800 font-semibold text-sm">
                     <FiAlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0" />
                     <span>
-                      Control Biológico de Desarrollo ({evaluacionBiologicaForm.edadMeses} meses de edad)
+                      Control Biológico de Desarrollo ({evaluacionBiologicaForm.etapa ? `${evaluacionBiologicaForm.etapa} - ` : ''}{evaluacionBiologicaForm.edadMeses} meses de edad)
                     </span>
                   </div>
-                  {evaluacionBiologicaForm.alertas.map((alerta, idx) => (
-                    <p key={idx} className="text-xs text-amber-700 pl-7">
+                  {watchTipo === 'oviparo' && 'postura' in evaluacionBiologicaForm && evaluacionBiologicaForm.postura && (
+                    <p className="text-xs text-amber-700 pl-7">
+                      Etapa de postura: {evaluacionBiologicaForm.postura}
+                    </p>
+                  )}
+                  {evaluacionBiologicaForm.alertas.map((alerta) => (
+                    <p key={`${alerta.tipo}-${alerta.mensaje}`} className="text-xs text-amber-700 pl-7">
                       {alerta.mensaje}
                     </p>
                   ))}
@@ -1131,6 +1507,45 @@ export default function GanadoPage() {
             </form>
           </Modal>
 
+          <Modal
+            isOpen={detailModalOpen}
+            onClose={handleCloseDetails}
+            title={animalDetail ? `Detalle del animal ${animalDetail.identificacion}` : 'Detalle del animal'}
+            size="lg"
+          >
+            {animalDetail && (
+              <div className="space-y-5">
+                {detailPhotoContent}
+                <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {[
+                    ['Tipo', animalDetail.tipo === 'oviparo' ? 'Ovíparo' : animalDetail.tipo],
+                    ...(animalDetail.tipo === 'oviparo'
+                      ? [[
+                          'Especie',
+                          ESPECIES_OVIPARAS.find((especie) => especie.value === animalDetail.especie)?.label || 'Sin especificar',
+                        ]]
+                      : []),
+                    ...(animalDetail.tipo === 'oviparo'
+                      ? [['Propósito', animalDetail.proposito || 'Sin especificar']]
+                      : []),
+                    ['Raza', animalDetail.raza || 'Sin especificar'],
+                    ['Sexo', animalDetail.sexo],
+                    ['Fecha de nacimiento', animalDetail.fechaNacimiento],
+                    ['Peso actual', animalDetail.pesoActual ? `${animalDetail.pesoActual} kg` : 'Sin registrar'],
+                    ['Estado de salud', animalDetail.estadoSalud],
+                    ['Estado', animalDetail.estado],
+                    ['Observaciones', animalDetail.observaciones || 'Sin observaciones'],
+                  ].map(([label, value]) => (
+                    <div key={label}>
+                      <dt className="text-sm font-medium text-gray-500">{label}</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+            )}
+          </Modal>
+
           {/* ========================================================================= */}
           {/* MODAL: REGISTRAR ORDEÑO DIARIO */}
           {/* ========================================================================= */}
@@ -1142,10 +1557,11 @@ export default function GanadoPage() {
           >
             <form onSubmit={handleGuardarOrdenio} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="ordenio-bovino" className="block text-sm font-medium text-gray-700 mb-1">
                   Vaca / Bovino <span className="text-red-500">*</span>
                 </label>
                 <select
+                  id="ordenio-bovino"
                   value={ordenioBovinoId}
                   onChange={(e) => setOrdenioBovinoId(Number(e.target.value))}
                   className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
@@ -1162,10 +1578,11 @@ export default function GanadoPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="ordenio-fecha" className="block text-sm font-medium text-gray-700 mb-1">
                     Fecha del Ordeño <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="ordenio-fecha"
                     type="date"
                     value={ordenioFecha}
                     onChange={(e) => setOrdenioFecha(e.target.value)}
@@ -1175,10 +1592,11 @@ export default function GanadoPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="ordenio-cantidad" className="block text-sm font-medium text-gray-700 mb-1">
                     Litros Recolectados <span className="text-red-500">*</span>
                   </label>
                   <input
+                    id="ordenio-cantidad"
                     type="number"
                     step="0.1"
                     min="0.1"
@@ -1192,12 +1610,15 @@ export default function GanadoPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="ordenio-sesion" className="block text-sm font-medium text-gray-700 mb-1">
                   Turno / Sesión
                 </label>
                 <select
+                  id="ordenio-sesion"
                   value={ordenioSesion}
-                  onChange={(e) => setOrdenioSesion(e.target.value as any)}
+                  onChange={(e) =>
+                    setOrdenioSesion(e.target.value as 'mañana' | 'tarde' | 'completa')
+                  }
                   className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:outline-none focus:ring-2 focus:ring-cyan-500"
                 >
                   <option value="completa">Día Completo</option>
@@ -1207,10 +1628,11 @@ export default function GanadoPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="ordenio-observaciones" className="block text-sm font-medium text-gray-700 mb-1">
                   Observaciones
                 </label>
                 <textarea
+                  id="ordenio-observaciones"
                   value={ordenioObservaciones}
                   onChange={(e) => setOrdenioObservaciones(e.target.value)}
                   rows={2}

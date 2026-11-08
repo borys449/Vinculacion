@@ -5,14 +5,14 @@ const {
   calcularProduccionLechera,
 } = require('../utils/ganaderiaUtils');
 
-describe('Módulo de Ganadería (Bovinos) - Pruebas Unitarias', () => {
+describe('Módulo de Ganadería (Bovinos y Porcinos) - Pruebas Unitarias', () => {
   describe('routes/ganado.js', () => {
     test('exporta un express router con middleware y rutas', () => {
       expect(typeof ganadoRouter.use).toBe('function');
     });
   });
 
-  describe('Lógica de Negocio: Validaciones Biológicas (Edad vs. Peso)', () => {
+  describe('Lógica de Negocio: Validaciones Biológicas Bovinas (Edad vs. Peso)', () => {
     test('Calcula la edad en meses correctamente', () => {
       const hoy = new Date();
       const hace3Meses = new Date(hoy.getFullYear(), hoy.getMonth() - 3, hoy.getDate());
@@ -101,6 +101,179 @@ describe('Módulo de Ganadería (Bovinos) - Pruebas Unitarias', () => {
         peso: -10,
       });
       expect(resNegativo.errorCritico).toBe(true);
+    });
+  });
+
+  describe('Lógica de Negocio: Validaciones Biológicas Porcinas (Edad vs. Peso)', () => {
+    test('0 a 1 mes (Lechón lactante): rango esperado 1.2 - 10 kg, alerta si < 1.0 kg o > 15 kg', () => {
+      const hoy = new Date();
+      const hace20Dias = new Date(hoy.getTime() - 20 * 24 * 60 * 60 * 1000);
+
+      // Peso crítico (< 1.0 kg)
+      const resCritico = validarRangosBiologicos({
+        tipo: 'porcino',
+        fechaNacimiento: hace20Dias,
+        peso: 0.8,
+      });
+
+      expect(resCritico.advertencias.length).toBeGreaterThan(0);
+      expect(resCritico.advertencias[0]).toContain('mínimo crítico');
+
+      // Peso adecuado (6 kg)
+      const resOk = validarRangosBiologicos({
+        tipo: 'porcino',
+        fechaNacimiento: hace20Dias,
+        peso: 6,
+      });
+      expect(resOk.advertencias.length).toBe(0);
+
+      // Peso excesivo (> 15 kg)
+      const resAlto = validarRangosBiologicos({
+        tipo: 'porcino',
+        fechaNacimiento: hace20Dias,
+        peso: 18,
+      });
+      expect(resAlto.advertencias.length).toBeGreaterThan(0);
+      expect(resAlto.advertencias[0]).toContain('supera el rango esperado para un lechón lactante');
+    });
+
+    test('2 a 3 meses (Lechón destetado / Recría): rango esperado 15 - 50 kg, alerta desnutrición si < 12 kg', () => {
+      const hoy = new Date();
+      const hace2MesesMedio = new Date(hoy.getFullYear(), hoy.getMonth() - 2, hoy.getDate());
+
+      // Alerta desnutrición
+      const resDesnutrido = validarRangosBiologicos({
+        tipo: 'porcino',
+        fechaNacimiento: hace2MesesMedio,
+        peso: 10,
+      });
+      expect(resDesnutrido.advertencias.length).toBeGreaterThan(0);
+      expect(resDesnutrido.advertencias[0]).toContain('Alerta de desnutrición');
+
+      // Peso normal en recría (28 kg)
+      const resNormal = validarRangosBiologicos({
+        tipo: 'porcino',
+        fechaNacimiento: hace2MesesMedio,
+        peso: 28,
+      });
+      expect(resNormal.advertencias.length).toBe(0);
+    });
+
+    test('4 a 6 meses (Crecimiento y engorde): rango esperado 45 - 130 kg, alerta retraso si < 40 kg', () => {
+      const hoy = new Date();
+      const hace5Meses = new Date(hoy.getFullYear(), hoy.getMonth() - 5, hoy.getDate());
+
+      // Retraso en engorde (< 40 kg)
+      const resBajo = validarRangosBiologicos({
+        tipo: 'porcino',
+        fechaNacimiento: hace5Meses,
+        peso: 35,
+      });
+      expect(resBajo.advertencias.length).toBeGreaterThan(0);
+      expect(resBajo.advertencias[0]).toContain('Alerta de retraso en engorde');
+
+      // Peso adecuado de mercado (105 kg)
+      const resMercado = validarRangosBiologicos({
+        tipo: 'porcino',
+        fechaNacimiento: hace5Meses,
+        peso: 105,
+      });
+      expect(resMercado.advertencias.length).toBe(0);
+    });
+
+    test('> 6 meses (Adulto / Reproductor): rango esperado 120 - 350+ kg, alerta si < 90 kg', () => {
+      const hoy = new Date();
+      const hace10Meses = new Date(hoy.getFullYear(), hoy.getMonth() - 10, hoy.getDate());
+
+      // Bajo peso para reproductor
+      const resBajo = validarRangosBiologicos({
+        tipo: 'porcino',
+        fechaNacimiento: hace10Meses,
+        peso: 75,
+      });
+      expect(resBajo.advertencias.length).toBeGreaterThan(0);
+      expect(resBajo.advertencias[0]).toContain('Alerta biológica');
+
+      // Reproductor óptimo (220 kg)
+      const resOk = validarRangosBiologicos({
+        tipo: 'porcino',
+        fechaNacimiento: hace10Meses,
+        peso: 220,
+      });
+      expect(resOk.advertencias.length).toBe(0);
+    });
+  });
+
+  describe('Validaciones biológicas de ovíparos', () => {
+    const haceMeses = (meses) => {
+      const fecha = new Date();
+      fecha.setDate(1);
+      fecha.setMonth(fecha.getMonth() - meses);
+      return fecha.toISOString().slice(0, 10);
+    };
+
+    test('usa etapas distintas para codornices y gansos', () => {
+      const codorniz = validarRangosBiologicos({
+        tipo: 'oviparo',
+        especie: 'codorniz',
+        sexo: 'hembra',
+        proposito: 'huevos',
+        fechaNacimiento: haceMeses(3),
+        peso: 0.2,
+      });
+      const ganso = validarRangosBiologicos({
+        tipo: 'oviparo',
+        especie: 'ganso',
+        sexo: 'hembra',
+        proposito: 'huevos',
+        fechaNacimiento: haceMeses(3),
+        peso: 2,
+      });
+
+      expect(codorniz.etapa).toBe('Ave adulta');
+      expect(codorniz.postura).toBe('Edad compatible con postura');
+      expect(ganso.etapa).toBe('Ave en crecimiento');
+      expect(ganso.postura).toMatch(/Prepostura/);
+    });
+
+    test('diferencia peso por sexo y raza comercial y solo emite alertas orientativas', () => {
+      const fechaNacimiento = haceMeses(12);
+      const gallinaLigera = validarRangosBiologicos({
+        tipo: 'oviparo',
+        especie: 'gallina',
+        sexo: 'hembra',
+        proposito: 'huevos',
+        raza: 'Leghorn',
+        fechaNacimiento,
+        peso: 5,
+      });
+      const gallo = validarRangosBiologicos({
+        tipo: 'oviparo',
+        especie: 'gallina',
+        sexo: 'macho',
+        proposito: 'reproduccion',
+        raza: 'Cornish',
+        fechaNacimiento,
+        peso: 5,
+      });
+
+      expect(gallinaLigera.advertencias).toHaveLength(1);
+      expect(gallinaLigera.errorCritico).toBeUndefined();
+      expect(gallo.advertencias).toHaveLength(0);
+    });
+
+    test('calcula etapa y postura aunque todavía no se haya registrado el peso', () => {
+      const resultado = validarRangosBiologicos({
+        tipo: 'oviparo',
+        especie: 'gallina',
+        sexo: 'hembra',
+        proposito: 'huevos',
+        fechaNacimiento: haceMeses(3),
+      });
+
+      expect(resultado.etapa).toBe('Ave en crecimiento');
+      expect(resultado.postura).toMatch(/Prepostura/);
+      expect(resultado.advertencias).toHaveLength(0);
     });
   });
 

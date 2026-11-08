@@ -17,7 +17,7 @@ const Ganado = sequelize.define('Ganado', {
     }
   },
   tipo: {
-    type: DataTypes.ENUM('bovino', 'porcino', 'ovino', 'caprino', 'avicola', 'otro'),
+    type: DataTypes.ENUM('bovino', 'porcino', 'ovino', 'caprino', 'avicola', 'oviparo', 'otro'),
     allowNull: false,
     validate: {
       notEmpty: true
@@ -30,8 +30,12 @@ const Ganado = sequelize.define('Ganado', {
       len: [0, 255]
     }
   },
+  especie: {
+    type: DataTypes.STRING(50),
+    allowNull: true
+  },
   proposito: {
-    type: DataTypes.ENUM('leche', 'carne', 'doble_proposito'),
+    type: DataTypes.ENUM('leche', 'huevos', 'carne', 'doble_proposito', 'reproduccion'),
     allowNull: true
   },
   produccionEstimadaDiaria: {
@@ -81,6 +85,10 @@ const Ganado = sequelize.define('Ganado', {
   },
   observaciones: {
     type: DataTypes.TEXT,
+    allowNull: true
+  },
+  foto: {
+    type: DataTypes.STRING(255),
     allowNull: true
   },
   responsableId: {
