@@ -3,6 +3,7 @@ require('./otel');
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
+const os = require('node:os');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser'); 
@@ -27,9 +28,27 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Configuración de CORS con origen específico
+const frontendPort = process.env.FRONTEND_PORT || '3001';
+const localNetworkOrigins = Object.values(os.networkInterfaces())
+  .flatMap((interfaces) => interfaces || [])
+  .filter((networkInterface) => networkInterface.family === 'IPv4' && !networkInterface.internal)
+  .map((networkInterface) => `http://${networkInterface.address}:${frontendPort}`);
+const configuredFrontendOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const allowedFrontendOrigins = new Set([
+  `http://localhost:${frontendPort}`,
+  `http://127.0.0.1:${frontendPort}`,
+  ...localNetworkOrigins,
+  ...configuredFrontendOrigins,
+]);
+
+// Configuración de CORS para los orígenes locales y de red del frontend
 const corsOptions = {
-  origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+  origin: (origin, callback) => {
+    callback(null, !origin || allowedFrontendOrigins.has(origin));
+  },
   credentials: true,
   optionsSuccessStatus: 200,
 };
@@ -118,13 +137,13 @@ if (process.env.NODE_ENV !== 'test') {
         const bcrypt = require('bcrypt');
         const usuariosPrueba = [
           {
-            nombre: process.env.ADMIN_NOMBRE,
-            cedula: process.env.ADMIN_CEDULA,
-            email: process.env.ADMIN_EMAIL,
-            telefono: process.env.ADMIN_TELEFONO,
+            nombre: process.env.ADMIN_NOMBRE || process.env.admin_name,
+            cedula: process.env.ADMIN_CEDULA || '0000000000',
+            email: process.env.ADMIN_EMAIL || process.env.admin_email,
+            telefono: process.env.ADMIN_TELEFONO || '0999999999',
             area: 'administracion',
             tipo: 'administrador',
-            passwordPlana: process.env.ADMIN_PASSWORD
+            passwordPlana: process.env.ADMIN_PASSWORD || process.env.admin_password
           },
           {
             nombre: process.env.CULTIVOS_NOMBRE,
