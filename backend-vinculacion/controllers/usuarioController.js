@@ -25,12 +25,12 @@ exports.obtenerUsuarios = async (req, res) => {
   }
 };
 
-// @desc    Crear un nuevo operador interno (hereda fincaId)
+// @desc    Crear un nuevo usuario interno (hereda fincaId)
 // @route   POST /api/usuarios
 // @access  Private/Admin
 exports.crearOperador = async (req, res) => {
   try {
-    const { nombre, cedula, email, telefono, area, password } = req.body;
+    let { nombre, cedula, email, telefono, area, tipo, password, confirmPassword } = req.body;
 
     if (!nombre || !cedula || !email || !telefono || !area || !password) {
       return res.status(400).json({
@@ -38,6 +38,26 @@ exports.crearOperador = async (req, res) => {
         message: 'Todos los campos son obligatorios: nombre, cédula, email, teléfono, área y contraseña.',
       });
     }
+
+    if (confirmPassword && password !== confirmPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Las contraseñas no coinciden',
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'La contraseña debe tener al menos 6 caracteres',
+      });
+    }
+
+    // Normalizar equivalencias comunes de área
+    if (area === 'agricultura') area = 'cultivos';
+    if (area === 'administrador') area = 'administracion';
+
+    const tipoFinal = tipo === 'administrador' ? 'administrador' : 'trabajador';
 
     const usuarioExiste = await Usuario.findOne({
       where: {
@@ -58,7 +78,7 @@ exports.crearOperador = async (req, res) => {
       email,
       telefono,
       area,
-      tipo: 'trabajador',
+      tipo: tipoFinal,
       password,
       activo: true,
       fincaId: req.usuario.fincaId,
@@ -69,7 +89,7 @@ exports.crearOperador = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: 'Operador creado exitosamente y vinculado a la finca',
+      message: 'Usuario creado exitosamente y vinculado a la finca',
       data: operadorSinPassword,
     });
   } catch (error) {

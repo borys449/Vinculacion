@@ -13,7 +13,7 @@ import Input from '@/components/ui/Input';
 import { Select } from '@/components/ui/Input';
 import { usuarioService } from '@/services/usuario.service';
 import { Usuario } from '@/services/auth.service';
-import { FiEdit, FiTrash2, FiKey } from 'react-icons/fi';
+import { FiEdit, FiTrash2, FiKey, FiEye, FiEyeOff, FiUserPlus } from 'react-icons/fi';
 import { format } from 'date-fns';
 
 export default function UsuariosPage() {
@@ -40,14 +40,18 @@ export default function UsuariosPage() {
   const [crearModalOpen, setCrearModalOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [editingUsuario, setEditingUsuario] = useState<Usuario | null>(null);
-  const [nuevoOperador, setNuevoOperador] = useState({
+  const [nuevoUsuario, setNuevoUsuario] = useState({
     nombre: '',
     cedula: '',
     email: '',
     telefono: '',
-    area: 'cultivos',
+    tipo: 'trabajador',
+    area: 'ganaderia',
     password: '',
+    confirmPassword: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [crearError, setCrearError] = useState<string | null>(null);
   const [crearLoading, setCrearLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -79,25 +83,39 @@ export default function UsuariosPage() {
     }
   }, [authLoading, user]);
 
-  const handleCrearOperador = async (e: React.FormEvent) => {
+  const handleCrearUsuario = async (e: React.FormEvent) => {
     e.preventDefault();
     setCrearError(null);
+
+    if (nuevoUsuario.password !== nuevoUsuario.confirmPassword) {
+      setCrearError('Las contraseñas no coinciden.');
+      return;
+    }
+    if (nuevoUsuario.password.length < 6) {
+      setCrearError('La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+
     setCrearLoading(true);
     try {
-      await usuarioService.createOperador(nuevoOperador);
+      await usuarioService.createOperador(nuevoUsuario);
       fetchUsuarios();
       setCrearModalOpen(false);
-      setNuevoOperador({
+      setNuevoUsuario({
         nombre: '',
         cedula: '',
         email: '',
         telefono: '',
-        area: 'cultivos',
+        tipo: 'trabajador',
+        area: 'ganaderia',
         password: '',
+        confirmPassword: '',
       });
-      alert('Operador creado y vinculado a la finca exitosamente');
+      setShowPassword(false);
+      setShowConfirmPassword(false);
+      alert('Usuario creado y vinculado a la finca exitosamente');
     } catch (err: any) {
-      setCrearError(err.response?.data?.message || err.message || 'Error al crear operador');
+      setCrearError(err.response?.data?.message || err.message || 'Error al crear usuario');
     } finally {
       setCrearLoading(false);
     }
@@ -273,14 +291,14 @@ export default function UsuariosPage() {
               <div className="mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-green-50 border border-green-200 p-4 rounded-xl">
                 <div>
                   <p className="text-sm font-semibold text-green-900">
-                    Control de Operadores y Multi-tenancy
+                    Administración de Usuarios y Roles de la Finca
                   </p>
                   <p className="text-xs text-green-700">
-                    Como Administrador, crea aquí tus operadores (agricultores y ganaderos). Heredarán automáticamente el identificador de tu finca.
+                    Crea y gestiona los trabajadores y administradores de tu finca asignándoles su área productiva (Ganadería, Agricultura o Administración).
                   </p>
                 </div>
                 <Button variant="primary" onClick={() => setCrearModalOpen(true)}>
-                  + Registrar Nuevo Operador
+                  + Crear Nuevo Usuario
                 </Button>
               </div>
               <Table columns={columns} data={usuarios} />
@@ -429,74 +447,133 @@ export default function UsuariosPage() {
             </div>
           </form>
         </Modal>
-        {/* Modal Crear Operador */}
+        {/* Modal Crear Usuario */}
         <Modal
           isOpen={crearModalOpen}
           onClose={() => setCrearModalOpen(false)}
-          title="Registrar Operador Interno de la Finca"
-          size="md"
+          title="Crear Nuevo Usuario de la Finca"
+          size="lg"
         >
           {crearError && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
               {crearError}
             </div>
           )}
-          <form onSubmit={handleCrearOperador} className="space-y-4">
-            <Input
-              label="Nombre Completo"
-              type="text"
-              value={nuevoOperador.nombre}
-              onChange={(e) => setNuevoOperador({ ...nuevoOperador, nombre: e.target.value })}
-              required
-            />
-            <Input
-              label="Cédula"
-              type="text"
-              value={nuevoOperador.cedula}
-              onChange={(e) => setNuevoOperador({ ...nuevoOperador, cedula: e.target.value })}
-              required
-            />
-            <Input
-              label="Email"
-              type="email"
-              value={nuevoOperador.email}
-              onChange={(e) => setNuevoOperador({ ...nuevoOperador, email: e.target.value })}
-              required
-            />
-            <Input
-              label="Teléfono"
-              type="tel"
-              value={nuevoOperador.telefono}
-              onChange={(e) => setNuevoOperador({ ...nuevoOperador, telefono: e.target.value })}
-              required
-            />
-            <Select
-              label="Área de Operación"
-              value={nuevoOperador.area}
-              onChange={(e) => setNuevoOperador({ ...nuevoOperador, area: e.target.value })}
-              options={[
-                { value: 'cultivos', label: 'Agricultura (Cultivos)' },
-                { value: 'ganaderia', label: 'Ganadería' },
-                { value: 'mantenimiento', label: 'Mantenimiento' },
-                { value: 'investigacion', label: 'Investigación' },
-              ]}
-              required
-            />
-            <Input
-              label="Contraseña Temporal"
-              type="password"
-              value={nuevoOperador.password}
-              onChange={(e) => setNuevoOperador({ ...nuevoOperador, password: e.target.value })}
-              placeholder="Mínimo 6 caracteres"
-              required
-            />
+          <form onSubmit={handleCrearUsuario} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Nombre Completo"
+                type="text"
+                placeholder="Ej: Juan Pérez"
+                value={nuevoUsuario.nombre}
+                onChange={(e) => setNuevoUsuario({ ...nuevoUsuario, nombre: e.target.value })}
+                required
+              />
 
-            <div className="flex justify-end space-x-3 pt-4">
+              <Input
+                label="Cédula"
+                type="text"
+                placeholder="10 dígitos numéricos"
+                value={nuevoUsuario.cedula}
+                onChange={(e) => setNuevoUsuario({ ...nuevoUsuario, cedula: e.target.value })}
+                required
+              />
+
+              <Input
+                label="Email"
+                type="email"
+                placeholder="correo@ejemplo.com"
+                value={nuevoUsuario.email}
+                onChange={(e) => setNuevoUsuario({ ...nuevoUsuario, email: e.target.value })}
+                required
+              />
+
+              <Input
+                label="Teléfono"
+                type="tel"
+                placeholder="0987654321"
+                value={nuevoUsuario.telefono}
+                onChange={(e) => setNuevoUsuario({ ...nuevoUsuario, telefono: e.target.value })}
+                required
+              />
+
+              <Select
+                label="Tipo de Usuario"
+                value={nuevoUsuario.tipo}
+                onChange={(e) => {
+                  const nuevoTipo = e.target.value;
+                  setNuevoUsuario((prev) => ({
+                    ...prev,
+                    tipo: nuevoTipo,
+                    area: nuevoTipo === 'administrador' ? 'administracion' : prev.area === 'administracion' ? 'ganaderia' : prev.area,
+                  }));
+                }}
+                options={[
+                  { value: 'trabajador', label: 'Trabajador (Operador)' },
+                  { value: 'administrador', label: 'Administrador' },
+                ]}
+                required
+              />
+
+              <Select
+                label="Área en la que Trabaja"
+                value={nuevoUsuario.area}
+                onChange={(e) => setNuevoUsuario({ ...nuevoUsuario, area: e.target.value })}
+                options={[
+                  { value: 'ganaderia', label: 'Ganadería' },
+                  { value: 'cultivos', label: 'Agricultura (Cultivos)' },
+                  { value: 'administracion', label: 'Administración' },
+                ]}
+                required
+              />
+
+              <Input
+                label="Contraseña"
+                type={showPassword ? 'text' : 'password'}
+                value={nuevoUsuario.password}
+                onChange={(e) => setNuevoUsuario({ ...nuevoUsuario, password: e.target.value })}
+                placeholder="Mínimo 6 caracteres"
+                required
+                rightElement={
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="text-gray-400 hover:text-gray-600 focus:outline-none p-1 rounded"
+                    title={showPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <FiEyeOff className="h-4 w-4" /> : <FiEye className="h-4 w-4" />}
+                  </button>
+                }
+              />
+
+              <Input
+                label="Confirmar Contraseña"
+                type={showConfirmPassword ? 'text' : 'password'}
+                value={nuevoUsuario.confirmPassword}
+                onChange={(e) => setNuevoUsuario({ ...nuevoUsuario, confirmPassword: e.target.value })}
+                placeholder="Repite la contraseña"
+                required
+                rightElement={
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="text-gray-400 hover:text-gray-600 focus:outline-none p-1 rounded"
+                    title={showConfirmPassword ? 'Ocultar contraseña' : 'Ver contraseña'}
+                    tabIndex={-1}
+                  >
+                    {showConfirmPassword ? <FiEyeOff className="h-4 w-4" /> : <FiEye className="h-4 w-4" />}
+                  </button>
+                }
+              />
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
               <Button type="button" variant="secondary" onClick={() => setCrearModalOpen(false)}>
                 Cancelar
               </Button>
               <Button type="submit" variant="primary" loading={crearLoading}>
-                Registrar Operador
+                Crear Usuario
               </Button>
             </div>
           </form>

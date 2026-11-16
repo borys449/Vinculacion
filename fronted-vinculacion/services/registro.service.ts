@@ -9,6 +9,7 @@ export interface Registro {
     | 'produccion'
     | 'venta'
     | 'leche'
+    | 'lote'
     | 'otro';
   categoria: string;
   descripcion: string;
@@ -27,10 +28,16 @@ export interface Registro {
   observaciones?: string;
   cultivoId?: number;
   ganadoId?: number;
+  loteId?: number;
   registradoPorId: number;
   registradoPor?: any;
   cultivo?: any;
   ganado?: any;
+  lote?: {
+    id: number;
+    nombre: string;
+    tipo: 'agricultura' | 'ganaderia';
+  };
   fechaRegistro: string;
 }
 
@@ -45,9 +52,20 @@ export type RegistroFormData = Omit<
 >;
 
 export const registroService = {
-  getAll: async (area?: string) => {
+  getAll: async (area?: string, operativos?: boolean) => {
+    const params: any = {};
+    if (area) params.area = area;
+    if (operativos === false) params.operativos = 'false';
+    const response = await api.get('/registros', { params });
+    return response.data;
+  },
+
+  getBitacora: async (area?: string) => {
     const response = await api.get('/registros', {
-      params: area ? { area } : {},
+      params: {
+        ...(area ? { area } : {}),
+        operativos: 'false',
+      },
     });
     return response.data;
   },

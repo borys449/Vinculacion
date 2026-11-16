@@ -4,11 +4,12 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   icon?: ReactNode;
+  rightElement?: ReactNode;
   suggestions?: string[];
 }
 
 const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, icon, className = '', value, type, suggestions, onChange, onBlur, ...props }, ref) => {
+  ({ label, error, icon, rightElement, className = '', value, type, suggestions, onChange, onBlur, ...props }, ref) => {
     const [query, setQuery] = useState('');
     const [focused, setFocused] = useState(false);
     const localRef = useRef<HTMLInputElement>(null);
@@ -119,10 +120,15 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
                 : 'border-gray-300 focus:ring-green-500 focus:border-green-500'
             } ${
               icon ? 'pl-10' : 'pl-3'
-            } pr-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-colors ${className}`}
+            } ${rightElement ? 'pr-10' : 'pr-3'} py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-colors ${className}`}
             {...inputProps}
             {...props}
           />
+          {rightElement && (
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+              {rightElement}
+            </div>
+          )}
         </div>
 
         {/* Lista de autocompletado */}

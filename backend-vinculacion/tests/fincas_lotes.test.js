@@ -1,6 +1,6 @@
 const { obtenerMiFinca, actualizarPerimetro } = require('../controllers/fincaController');
 const { obtenerLotes, crearLote, actualizarLote, eliminarLote } = require('../controllers/loteController');
-const { Finca, Lote, Registro } = require('../models');
+const { Finca, Lote, Registro, Cultivo, Ganado } = require('../models');
 
 describe('Fincas & Lotes Controller & Rules', () => {
   let req, res;
@@ -124,6 +124,34 @@ describe('Fincas & Lotes Controller & Rules', () => {
         tipo: 'lote',
         categoria: 'Creación de Lote',
         descripcion: expect.stringContaining('creó el lote \'Lote Cacao 1\'')
+      }));
+    });
+
+    test('eliminarLote desvincula cultivos y ganado asociados y elimina el lote correctamente', async () => {
+      req.params = { id: 2 };
+      const mockLote = {
+        id: 2,
+        nombre: 'Lote Ganadero Lodana 1',
+        tipo: 'ganaderia',
+        fincaId: 1,
+        destroy: jest.fn().mockResolvedValue(true)
+      };
+
+      jest.spyOn(Lote, 'findOne').mockResolvedValue(mockLote);
+      jest.spyOn(Cultivo, 'update').mockResolvedValue([1]);
+      jest.spyOn(Ganado, 'update').mockResolvedValue([1]);
+      jest.spyOn(Registro, 'update').mockResolvedValue([1]);
+      jest.spyOn(Registro, 'create').mockResolvedValue({});
+
+      await eliminarLote(req, res);
+
+      expect(Cultivo.update).toHaveBeenCalledWith({ loteId: null }, { where: { loteId: 2 } });
+      expect(Ganado.update).toHaveBeenCalledWith({ loteId: null }, { where: { loteId: 2 } });
+      expect(mockLote.destroy).toHaveBeenCalled();
+      expect(res.status).toHaveBeenCalledWith(200);
+      expect(Registro.create).toHaveBeenCalledWith(expect.objectContaining({
+        tipo: 'lote',
+        categoria: 'Eliminación de Lote'
       }));
     });
   });

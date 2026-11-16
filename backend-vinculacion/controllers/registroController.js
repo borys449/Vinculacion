@@ -1,13 +1,16 @@
-const { Registro, Usuario, Cultivo, Ganado } = require('../models');
+const { Registro, Usuario, Cultivo, Ganado, Lote } = require('../models');
 const { Op } = require('sequelize');
 
 // Función auxiliar para construir el filtro estricto por área y multi-tenancy (fincaId)
 const construirFiltroArea = (usuario, areaParam, soloFinancierosUOperativos = true) => {
   let baseFiltro = {};
 
+  const normalizarArea = (a) => (a === 'agricultura' ? 'cultivos' : a);
+
   if (!usuario) {
-    if (areaParam === 'cultivos' || areaParam === 'ganaderia') {
-      baseFiltro = obtenerReglasPorArea(areaParam);
+    const areaNorm = normalizarArea(areaParam);
+    if (areaNorm === 'cultivos' || areaNorm === 'ganaderia') {
+      baseFiltro = obtenerReglasPorArea(areaNorm, soloFinancierosUOperativos);
     }
   } else {
     if (usuario.fincaId) {
@@ -16,20 +19,22 @@ const construirFiltroArea = (usuario, areaParam, soloFinancierosUOperativos = tr
 
     let areaTarget = null;
     if (usuario.tipo !== 'administrador') {
-      areaTarget = usuario.area;
+      // Si estamos en la bitácora completa (soloFinancierosUOperativos = false), los trabajadores
+      // pueden ver las actualizaciones y actividades de su área y las generales de la finca
+      areaTarget = normalizarArea(usuario.area);
     } else if (areaParam && areaParam !== 'global' && areaParam !== 'todos') {
-      areaTarget = areaParam;
+      areaTarget = normalizarArea(areaParam);
     }
 
     if (areaTarget === 'cultivos' || areaTarget === 'ganaderia') {
       baseFiltro = {
         ...baseFiltro,
-        ...obtenerReglasPorArea(areaTarget)
+        ...obtenerReglasPorArea(areaTarget, soloFinancierosUOperativos)
       };
     }
   }
 
-  // Filtrado estricto para excluir eventos de auditoría y actualizaciones automáticas
+  // Filtrado estricto para excluir eventos de auditoría y actualizaciones automáticas solo en asientos financieros
   if (soloFinancierosUOperativos) {
     return {
       [Op.and]: [
@@ -51,8 +56,31 @@ const construirFiltroArea = (usuario, areaParam, soloFinancierosUOperativos = tr
   return baseFiltro;
 };
 
-const obtenerReglasPorArea = (area) => {
+const obtenerReglasPorArea = (area, soloFinancierosUOperativos = true) => {
   if (area === 'cultivos') {
+    if (!soloFinancierosUOperativos) {
+      // En la bitácora: el trabajador de agricultura ve cultivos y lotes EXCLUSIVAMENTE de agricultura
+      return {
+        [Op.and]: [
+          { ganadoId: null },
+          { tipo: { [Op.notIn]: ['ganado', 'leche'] } },
+          { descripcion: { [Op.notLike]: '%ganaderia%' } },
+          {
+            [Op.or]: [
+              { cultivoId: { [Op.not]: null } },
+              { tipo: 'cultivo' },
+              {
+                [Op.and]: [
+                  { tipo: 'lote' },
+                  { descripcion: { [Op.like]: '%agricultura%' } }
+                ]
+              },
+              { categoria: { [Op.in]: ['Actualización de Perímetro', 'Creación de Cultivo', 'Actualización'] } }
+            ]
+          }
+        ]
+      };
+    }
     return {
       [Op.and]: [
         { ganadoId: null },
@@ -68,6 +96,29 @@ const obtenerReglasPorArea = (area) => {
   }
 
   if (area === 'ganaderia') {
+    if (!soloFinancierosUOperativos) {
+      // En la bitácora: el trabajador de ganadería ve ganado y lotes EXCLUSIVAMENTE de ganadería
+      return {
+        [Op.and]: [
+          { cultivoId: null },
+          { tipo: { [Op.ne]: 'cultivo' } },
+          { descripcion: { [Op.notLike]: '%agricultura%' } },
+          {
+            [Op.or]: [
+              { ganadoId: { [Op.not]: null } },
+              { tipo: { [Op.in]: ['ganado', 'leche'] } },
+              {
+                [Op.and]: [
+                  { tipo: 'lote' },
+                  { descripcion: { [Op.like]: '%ganaderia%' } }
+                ]
+              },
+              { categoria: { [Op.in]: ['Actualización de Perímetro', 'Creación de Animal', 'Actualización'] } }
+            ]
+          }
+        ]
+      };
+    }
     return {
       [Op.and]: [
         { cultivoId: null },
@@ -85,6 +136,18 @@ const obtenerReglasPorArea = (area) => {
   return {};
 };
 
+const obtenerIncludeRegistros = () => {
+  const inc = [
+    { model: Usuario, as: 'registradoPor', attributes: ['id', 'nombre', 'tipo', 'area'], required: false },
+    { model: Cultivo, as: 'cultivo', attributes: ['id', 'nombre'], required: false },
+    { model: Ganado, as: 'ganado', attributes: ['id', 'identificacion'], required: false }
+  ];
+  if (Lote) {
+    inc.push({ model: Lote, as: 'lote', attributes: ['id', 'nombre', 'tipo'], required: false });
+  }
+  return inc;
+};
+
 // @desc    Obtener todos los registros (Registros financieros limpios)
 // @route   GET /api/registros
 // @access  Private
@@ -95,11 +158,7 @@ exports.obtenerRegistros = async (req, res) => {
 
     const registros = await Registro.findAll({
       where: donde,
-      include: [
-        { model: Usuario, as: 'registradoPor', attributes: ['id', 'nombre', 'tipo', 'area'], required: false },
-        { model: Cultivo, as: 'cultivo', attributes: ['id', 'nombre'] },
-        { model: Ganado, as: 'ganado', attributes: ['id', 'identificacion'] }
-      ],
+      include: obtenerIncludeRegistros(),
       order: [['fecha', 'DESC']]
     });
 
@@ -119,11 +178,7 @@ exports.obtenerRegistros = async (req, res) => {
 exports.obtenerRegistro = async (req, res) => {
   try {
     const registro = await Registro.findByPk(req.params.id, {
-      include: [
-        { model: Usuario, as: 'registradoPor', attributes: ['id', 'nombre', 'tipo', 'area'] },
-        { model: Cultivo, as: 'cultivo', attributes: ['id', 'nombre'] },
-        { model: Ganado, as: 'ganado', attributes: ['id', 'identificacion'] }
-      ]
+      include: obtenerIncludeRegistros()
     });
 
     if (!registro) {
@@ -265,11 +320,7 @@ exports.obtenerDatosDashboard = async (req, res) => {
 
     const actividadReciente = await Registro.findAll({
       where: donde,
-      include: [
-        { model: Usuario, as: 'registradoPor', attributes: ['id', 'nombre', 'tipo', 'area'], required: false },
-        { model: Cultivo, as: 'cultivo', attributes: ['id', 'nombre'] },
-        { model: Ganado, as: 'ganado', attributes: ['id', 'identificacion'] }
-      ],
+      include: obtenerIncludeRegistros(),
       order: [['fecha', 'DESC']],
       limit: 5
     });

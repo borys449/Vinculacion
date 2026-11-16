@@ -1,4 +1,4 @@
-const { Lote, Usuario, Registro } = require('../models');
+const { Lote, Usuario, Registro, Cultivo, Ganado } = require('../models');
 
 // Función auxiliar para validar permisos según la rama (agricultura vs ganadería)
 const puedeGestionarRama = (usuario, tipoLote) => {
@@ -113,11 +113,15 @@ exports.crearLote = async (req, res) => {
       creadoPorId: req.usuario.id
     });
 
+    const rolInfo = req.usuario.tipo === 'administrador'
+      ? 'Rol: administrador'
+      : `Rol: ${req.usuario.tipo}, Área: ${req.usuario.area}`;
+
     // Registrar en la Bitácora con autoría, rol y usuario
     await Registro.create({
       tipo: 'lote',
       categoria: 'Creación de Lote',
-      descripcion: `El usuario ${req.usuario.nombre} (Rol: ${req.usuario.tipo}, Área: ${req.usuario.area}) creó el lote '${nuevoLote.nombre}' asignado a la rama de ${nuevoLote.tipo}.`,
+      descripcion: `El usuario ${req.usuario.nombre} (${rolInfo}) creó el lote '${nuevoLote.nombre}' asignado a la rama de ${nuevoLote.tipo}.`,
       fecha: new Date(),
       fincaId: req.usuario.fincaId,
       loteId: nuevoLote.id,
@@ -175,11 +179,15 @@ exports.actualizarLote = async (req, res) => {
     await lote.update(req.body);
     await lote.reload();
 
+    const rolInfo = req.usuario.tipo === 'administrador'
+      ? 'Rol: administrador'
+      : `Rol: ${req.usuario.tipo}, Área: ${req.usuario.area}`;
+
     // Registrar en la Bitácora
     await Registro.create({
       tipo: 'lote',
       categoria: 'Actualización de Lote',
-      descripcion: `El usuario ${req.usuario.nombre} (Rol: ${req.usuario.tipo}, Área: ${req.usuario.area}) actualizó el lote '${lote.nombre}' (${lote.tipo}). Estado previo: ${datosAnteriores}.`,
+      descripcion: `El usuario ${req.usuario.nombre} (${rolInfo}) actualizó el lote '${lote.nombre}' (${lote.tipo}). Estado previo: ${datosAnteriores}.`,
       fecha: new Date(),
       fincaId: req.usuario.fincaId,
       loteId: lote.id,
@@ -204,12 +212,17 @@ exports.actualizarLote = async (req, res) => {
 // @access  Private
 exports.eliminarLote = async (req, res) => {
   try {
-    const lote = await Lote.findOne({
+    let lote = await Lote.findOne({
       where: {
         id: req.params.id,
         fincaId: req.usuario.fincaId
       }
     });
+
+    // Si es administrador y el lote fue creado por defecto o sin fincaId coincidente
+    if (!lote && req.usuario.tipo === 'administrador') {
+      lote = await Lote.findByPk(req.params.id);
+    }
 
     if (!lote) {
       return res.status(404).json({
@@ -228,16 +241,47 @@ exports.eliminarLote = async (req, res) => {
 
     const nombreLote = lote.nombre;
     const tipoLote = lote.tipo;
+    const idLote = lote.id;
+    const fincaIdEfectivo = lote.fincaId || req.usuario.fincaId;
+
+    // Desvincular cultivos, ganado y registros asociados a este lote para evitar fallos por restricción RESTRICT de clave foránea
+    if (Cultivo && typeof Cultivo.update === 'function') {
+      try {
+        await Cultivo.update({ loteId: null }, { where: { loteId: idLote } });
+      } catch (e) {
+        console.warn('Aviso al desvincular cultivos del lote:', e.message);
+      }
+    }
+
+    if (Ganado && typeof Ganado.update === 'function') {
+      try {
+        await Ganado.update({ loteId: null }, { where: { loteId: idLote } });
+      } catch (e) {
+        console.warn('Aviso al desvincular ganado del lote:', e.message);
+      }
+    }
+
+    if (Registro && typeof Registro.update === 'function') {
+      try {
+        await Registro.update({ loteId: null }, { where: { loteId: idLote } });
+      } catch (e) {
+        console.warn('Aviso al desvincular registros del lote:', e.message);
+      }
+    }
 
     await lote.destroy();
+
+    const rolInfo = req.usuario.tipo === 'administrador'
+      ? 'Rol: administrador'
+      : `Rol: ${req.usuario.tipo}, Área: ${req.usuario.area}`;
 
     // Registrar en la Bitácora
     await Registro.create({
       tipo: 'lote',
       categoria: 'Eliminación de Lote',
-      descripcion: `El usuario ${req.usuario.nombre} (Rol: ${req.usuario.tipo}, Área: ${req.usuario.area}) eliminó el lote '${nombreLote}' de la rama ${tipoLote}.`,
+      descripcion: `El usuario ${req.usuario.nombre} (${rolInfo}) eliminó el lote '${nombreLote}' de la rama ${tipoLote}.`,
       fecha: new Date(),
-      fincaId: req.usuario.fincaId,
+      fincaId: fincaIdEfectivo,
       registradoPorId: req.usuario.id
     });
 

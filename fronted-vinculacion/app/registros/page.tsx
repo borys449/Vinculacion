@@ -20,7 +20,7 @@ import {
 import { cultivoService } from '@/services/cultivo.service';
 import { ganadoService } from '@/services/ganado.service';
 import { registroContableSchema, RegistroContableSchemaType } from '@/schemas/registroContableSchema';
-import { FiPlus, FiEdit, FiTrash2, FiDollarSign, FiFilter } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiDollarSign, FiFilter, FiClock } from 'react-icons/fi';
 import { format } from 'date-fns';
 
 export default function RegistrosPage() {
@@ -28,7 +28,7 @@ export default function RegistrosPage() {
   const router = useRouter();
 
   const isAdmin = user?.tipo === 'administrador';
-  const isCultivos = user?.area === 'cultivos';
+  const isCultivos = user?.area === 'cultivos' || user?.area === 'agricultura';
   const isGanaderia = user?.area === 'ganaderia';
 
   // Segmentación por área para administrador
@@ -55,11 +55,22 @@ export default function RegistrosPage() {
   }, [user, authLoading, isAdmin, isCultivos, isGanaderia, router]);
 
   const [registros, setRegistros] = useState<Registro[]>([]);
+  const [bitacora, setBitacora] = useState<any[]>([]);
+  const [vistaActiva, setVistaActiva] = useState<'contables' | 'bitacora'>('contables');
   const [cultivos, setCultivos] = useState<any[]>([]);
   const [ganado, setGanado] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRegistro, setEditingRegistro] = useState<Registro | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('tab') === 'bitacora') {
+        setVistaActiva('bitacora');
+      }
+    }
+  }, []);
 
   const [totales, setTotales] = useState({
     ingresos: 0,
@@ -108,9 +119,13 @@ export default function RegistrosPage() {
       setLoading(true);
       const areaParam = targetArea === 'global' ? undefined : targetArea;
 
-      const [registrosRes, cultivosRes, ganadoRes, resumenRes] = await Promise.all([
+      const [registrosRes, bitacoraRes, cultivosRes, ganadoRes, resumenRes] = await Promise.all([
         registroService.getAll(areaParam).catch((err) => {
           console.error('Error al cargar registros:', err);
+          return { success: false, data: [] };
+        }),
+        registroService.getBitacora(areaParam).catch((err) => {
+          console.error('Error al cargar bitácora:', err);
           return { success: false, data: [] };
         }),
         isAdmin || isCultivos
@@ -127,6 +142,9 @@ export default function RegistrosPage() {
 
       if (registrosRes && registrosRes.success) {
         setRegistros(registrosRes.data || []);
+      }
+      if (bitacoraRes && bitacoraRes.success) {
+        setBitacora(bitacoraRes.data || []);
       }
       if (resumenRes && resumenRes.success && resumenRes.data) {
         setTotales({
@@ -244,6 +262,39 @@ export default function RegistrosPage() {
   const filteredCultivos = cultivos;
   const filteredGanado = ganado;
 
+  const bitacoraFiltrada = useMemo(() => {
+    if (!Array.isArray(bitacora)) return [];
+    if (activeArea === 'global') return bitacora;
+
+    return bitacora.filter((item) => {
+      if (!item) return false;
+      const desc = (item.descripcion || '').toLowerCase();
+      const loteTipo = item.lote?.tipo;
+
+      if (item.tipo === 'lote' || item.loteId || item.lote) {
+        if (activeArea === 'cultivos') {
+          if (loteTipo === 'ganaderia') return false;
+          if (desc.includes('ganaderia') || desc.includes('ganadería')) return false;
+          return true;
+        }
+        if (activeArea === 'ganaderia') {
+          if (loteTipo === 'agricultura') return false;
+          if (desc.includes('agricultura') || desc.includes('cultivo')) return false;
+          return true;
+        }
+      }
+
+      if (activeArea === 'cultivos') {
+        if (item.ganadoId || item.tipo === 'ganado' || item.tipo === 'leche') return false;
+      }
+      if (activeArea === 'ganaderia') {
+        if (item.cultivoId || item.tipo === 'cultivo') return false;
+      }
+
+      return true;
+    });
+  }, [bitacora, activeArea]);
+
   const columns = [
     {
       key: 'fecha',
@@ -294,6 +345,58 @@ export default function RegistrosPage() {
           </button>
         </div>
       ),
+    },
+  ];
+
+  const bitacoraColumns = [
+    {
+      key: 'fecha',
+      label: 'Fecha y Hora',
+      render: (value: string) => {
+        try {
+          return format(new Date(value), 'dd/MM/yyyy HH:mm');
+        } catch {
+          return value || '-';
+        }
+      },
+    },
+    {
+      key: 'registradoPor',
+      label: 'Usuario',
+      render: (value: any) => (
+        <span className="font-medium text-gray-800">
+          {value?.nombre || 'Sistema'}
+          {value?.tipo && (
+            <span className="ml-1 text-[10px] text-gray-500 uppercase">
+              ({value.tipo})
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'tipo',
+      label: 'Módulo',
+      render: (value: string) => (
+        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-gray-100 text-gray-700 uppercase">
+          {value || 'General'}
+        </span>
+      ),
+    },
+    { key: 'categoria', label: 'Categoría' },
+    { key: 'descripcion', label: 'Detalle de la Actividad' },
+    {
+      key: 'impacto',
+      label: 'Impacto',
+      render: (_: any, row: any) => {
+        if (Number(row.ingresos) > 0) {
+          return <span className="text-green-600 font-semibold">+${Number(row.ingresos).toFixed(2)}</span>;
+        }
+        if (Number(row.costo) > 0) {
+          return <span className="text-red-600 font-semibold">-${Number(row.costo).toFixed(2)}</span>;
+        }
+        return <span className="text-gray-400 text-xs">Operativo</span>;
+      },
     },
   ];
 
@@ -467,25 +570,76 @@ export default function RegistrosPage() {
             </div>
           </div>
 
+          {/* Pestañas de Navegación: Contables vs Bitácora */}
+          <div className="flex border-b border-gray-200 gap-4">
+            <button
+              type="button"
+              onClick={() => setVistaActiva('contables')}
+              className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-all ${
+                vistaActiva === 'contables'
+                  ? 'border-green-600 text-green-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <FiDollarSign className="h-4 w-4" />
+              Registros Contables ({registros.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setVistaActiva('bitacora')}
+              className={`pb-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition-all ${
+                vistaActiva === 'bitacora'
+                  ? 'border-purple-600 text-purple-700'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <FiClock className="h-4 w-4" />
+              Bitácora de Actividades ({bitacoraFiltrada.length})
+            </button>
+          </div>
+
           <Card
-            title="Listado de Registros"
-            subtitle={`Visualizando ${registros.length} registros para ${getAreaLabel()}`}
+            title={vistaActiva === 'contables' ? 'Listado de Registros Contables' : 'Bitácora de Actividades y Trazabilidad'}
+            subtitle={
+              vistaActiva === 'contables'
+                ? `Visualizando ${registros.length} registros financieros para ${getAreaLabel()}`
+                : `Visualizando ${bitacoraFiltrada.length} eventos registrados para ${getAreaLabel()}`
+            }
             headerAction={
-              <Button onClick={() => setModalOpen(true)} icon={<FiPlus />}>
-                Nuevo Registro
-              </Button>
+              vistaActiva === 'contables' ? (
+                <Button onClick={() => setModalOpen(true)} icon={<FiPlus />}>
+                  Nuevo Registro
+                </Button>
+              ) : undefined
             }
           >
             {loading ? (
               <div className="flex justify-center py-8">
                 <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-600"></div>
               </div>
-            ) : registros.length === 0 ? (
+            ) : vistaActiva === 'contables' ? (
+              registros.length === 0 ? (
+                <div className="text-center py-10 text-gray-500 text-sm">
+                  <p>No hay registros contables creados para {getAreaLabel()}.</p>
+                  {bitacoraFiltrada.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setVistaActiva('bitacora')}
+                      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 rounded-lg hover:bg-purple-100 transition"
+                    >
+                      <FiClock /> Ver {bitacoraFiltrada.length} eventos en la Bitácora de Actividades →
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <Table columns={columns} data={registros} />
+              )
+            ) : bitacoraFiltrada.length === 0 ? (
               <div className="text-center py-10 text-gray-400 text-sm">
-                No hay registros contables creados para {getAreaLabel()}.
+                No hay actividades ni eventos registrados en la bitácora aún para {getAreaLabel()}.
               </div>
             ) : (
-              <Table columns={columns} data={registros} />
+              <Table columns={bitacoraColumns} data={bitacoraFiltrada} />
             )}
           </Card>
         </div>

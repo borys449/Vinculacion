@@ -138,15 +138,25 @@ export default function DashboardPage() {
 
   const abrirModalBitacora = async () => {
     setShowModalBitacora(true);
+    // Pre-cargar de inmediato con la actividad reciente visible en el dashboard para asegurar visualización instantánea
+    if (actividadReciente && actividadReciente.length > 0) {
+      setHistorialCompleto(actividadReciente);
+    }
     setLoadingHistorial(true);
     try {
       const areaParam = activeArea === 'global' ? undefined : activeArea;
-      const res = await registroService.getAll(areaParam);
-      if (res.success) {
-        setHistorialCompleto(res.data || []);
+      // Consultamos la bitácora completa sin filtrar auditorías
+      const res = await registroService.getBitacora(areaParam);
+      if (res && res.success && Array.isArray(res.data) && res.data.length > 0) {
+        setHistorialCompleto(res.data);
+      } else if (actividadReciente.length > 0) {
+        setHistorialCompleto(actividadReciente);
       }
     } catch (error) {
       console.error('Error al cargar historial completo:', error);
+      if (actividadReciente.length > 0) {
+        setHistorialCompleto(actividadReciente);
+      }
     } finally {
       setLoadingHistorial(false);
     }
@@ -158,6 +168,38 @@ export default function DashboardPage() {
     ...datosTendencias.flatMap((item) => [Number(item.ingresos || 0), Number(item.costos || 0)]),
     100
   );
+
+  const filtrarPorRamaArea = (item: any) => {
+    if (!item) return false;
+    if (activeArea === 'global') return true;
+    const desc = (item.descripcion || '').toLowerCase();
+    const loteTipo = item.lote?.tipo;
+
+    if (item.tipo === 'lote' || item.loteId || item.lote) {
+      if (activeArea === 'cultivos') {
+        if (loteTipo === 'ganaderia') return false;
+        if (desc.includes('ganaderia') || desc.includes('ganadería')) return false;
+        return true;
+      }
+      if (activeArea === 'ganaderia') {
+        if (loteTipo === 'agricultura') return false;
+        if (desc.includes('agricultura') || desc.includes('cultivo')) return false;
+        return true;
+      }
+    }
+
+    if (activeArea === 'cultivos') {
+      if (item.ganadoId || item.tipo === 'ganado' || item.tipo === 'leche') return false;
+    }
+    if (activeArea === 'ganaderia') {
+      if (item.cultivoId || item.tipo === 'cultivo') return false;
+    }
+    return true;
+  };
+
+  const actividadRecienteFiltrada = useMemo(() => {
+    return (actividadReciente || []).filter(filtrarPorRamaArea);
+  }, [actividadReciente, activeArea]);
 
   const getAreaLabel = () => {
     if (activeArea === 'cultivos') return 'Cultivos';
@@ -376,12 +418,12 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="space-y-4">
-                    {actividadReciente.length === 0 ? (
+                    {actividadRecienteFiltrada.length === 0 ? (
                       <p className="text-sm text-gray-500 text-center py-6">
                         No hay registros de actividad reciente para {getAreaLabel()}.
                       </p>
                     ) : (
-                      actividadReciente.map((item) => {
+                      actividadRecienteFiltrada.map((item) => {
                         const nombreUsuario = item.registradoPor
                           ? item.registradoPor.nombre
                           : 'Sistema';
@@ -529,11 +571,18 @@ export default function DashboardPage() {
                     </div>
                   ) : (
                     (() => {
-                      const registrosFiltrados = historialCompleto.filter((item) => {
-                        if (!mesSeleccionado) return true;
-                        const fechaItem = new Date(item.fecha).toISOString().slice(0, 7);
-                        return fechaItem === mesSeleccionado;
-                      });
+                      const registrosFiltrados = historialCompleto
+                        .filter(filtrarPorRamaArea)
+                        .filter((item) => {
+                          if (!mesSeleccionado) return true;
+                          if (!item?.fecha) return true;
+                          try {
+                            const fechaItem = new Date(item.fecha).toISOString().slice(0, 7);
+                            return fechaItem === mesSeleccionado;
+                          } catch {
+                            return true;
+                          }
+                        });
 
                       if (registrosFiltrados.length === 0) {
                         return (
@@ -548,13 +597,21 @@ export default function DashboardPage() {
                           ? item.registradoPor.nombre
                           : 'Sistema';
                         const iniciales = obtenerIniciales(nombreUsuario);
-                        const fechaFormateada = new Date(item.fecha).toLocaleDateString('es-ES', {
-                          day: '2-digit',
-                          month: 'short',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit',
-                        });
+                        const fechaFormateada = item.fecha
+                          ? (() => {
+                              try {
+                                return new Date(item.fecha).toLocaleDateString('es-ES', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                });
+                              } catch {
+                                return String(item.fecha);
+                              }
+                            })()
+                          : 'Reciente';
 
                         return (
                           <div
@@ -601,7 +658,14 @@ export default function DashboardPage() {
                   )}
                 </div>
 
-                <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex justify-end">
+                <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
+                  <Link
+                    href="/registros?tab=bitacora"
+                    onClick={() => setShowModalBitacora(false)}
+                    className="text-xs text-purple-700 hover:text-purple-900 font-semibold flex items-center gap-1"
+                  >
+                    Abrir en Pantalla Completa →
+                  </Link>
                   <button
                     onClick={() => setShowModalBitacora(false)}
                     className="px-4 py-2 bg-gray-900 text-white text-xs font-semibold rounded-lg hover:bg-gray-800 transition-colors"
