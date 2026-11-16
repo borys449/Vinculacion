@@ -18,6 +18,10 @@ export const cultivoSchema = z.object({
     .string()
     .trim()
     .min(3, 'La ubicación debe tener al menos 3 caracteres'),
+  loteId: z
+    .coerce
+    .number({ message: 'El lote es obligatorio' })
+    .positive('Debe seleccionar obligatoriamente un lote agrícola válido'),
   fechaSiembra: z
     .string()
     .min(1, 'La fecha de siembra es requerida')

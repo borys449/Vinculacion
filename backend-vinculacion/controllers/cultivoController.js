@@ -1,10 +1,14 @@
-const { Cultivo, Usuario, Registro } = require('../models');
+const { Cultivo, Usuario, Registro, Lote } = require('../models');
 const { Op } = require('sequelize');
 
 exports.obtenerCultivos = async (req, res) => {
   try {
     const { search } = req.query;
     let donde = {};
+
+    if (req.usuario && req.usuario.fincaId) {
+      donde.fincaId = req.usuario.fincaId;
+    }
 
     if (search) {
       donde[Op.or] = [
@@ -15,11 +19,18 @@ exports.obtenerCultivos = async (req, res) => {
 
     const cultivos = await Cultivo.findAll({
       where: donde,
-      include: [{
-        model: Usuario,
-        as: 'responsable',
-        attributes: ['id', 'nombre', 'email', 'area']
-      }],
+      include: [
+        {
+          model: Usuario,
+          as: 'responsable',
+          attributes: ['id', 'nombre', 'email', 'area']
+        },
+        {
+          model: Lote,
+          as: 'lote',
+          attributes: ['id', 'nombre', 'tipo']
+        }
+      ],
       order: [['fechaRegistro', 'DESC']]
     });
     
@@ -38,12 +49,25 @@ exports.obtenerCultivos = async (req, res) => {
 
 exports.obtenerCultivo = async (req, res) => {
   try {
-    const cultivo = await Cultivo.findByPk(req.params.id, {
-      include: [{
-        model: Usuario,
-        as: 'responsable',
-        attributes: ['id', 'nombre', 'email', 'area']
-      }]
+    let donde = { id: req.params.id };
+    if (req.usuario && req.usuario.fincaId) {
+      donde.fincaId = req.usuario.fincaId;
+    }
+
+    const cultivo = await Cultivo.findOne({
+      where: donde,
+      include: [
+        {
+          model: Usuario,
+          as: 'responsable',
+          attributes: ['id', 'nombre', 'email', 'area']
+        },
+        {
+          model: Lote,
+          as: 'lote',
+          attributes: ['id', 'nombre', 'tipo']
+        }
+      ]
     });
 
     if (!cultivo) {
@@ -69,6 +93,33 @@ exports.crearCultivo = async (req, res) => {
   try {
     let datosCultivo = { ...req.body };
 
+    // Regla de negocio estricta: Cultivo amarrado obligatoriamente a un loteId existente
+    if (!datosCultivo.loteId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Orden estricto: Debe seleccionar obligatoriamente un lote agrícola existente.'
+      });
+    }
+
+    const lote = await Lote.findOne({
+      where: {
+        id: datosCultivo.loteId,
+        ...(req.usuario && req.usuario.fincaId ? { fincaId: req.usuario.fincaId } : {}),
+        tipo: 'agricultura'
+      }
+    });
+
+    if (!lote) {
+      return res.status(400).json({
+        success: false,
+        message: 'El lote seleccionado no existe en su finca o no pertenece a la rama agrícola.'
+      });
+    }
+
+    if (!datosCultivo.ubicacion) {
+      datosCultivo.ubicacion = lote.nombre;
+    }
+
     if (!datosCultivo.fechaCosechaEstimada && datosCultivo.fechaSiembra) {
       const fechaSiembra = new Date(datosCultivo.fechaSiembra);
       let mesesMaduracion = 3;
@@ -83,15 +134,19 @@ exports.crearCultivo = async (req, res) => {
 
     const cultivo = await Cultivo.create({
       ...datosCultivo,
+      fincaId: req.usuario ? req.usuario.fincaId : lote.fincaId,
+      loteId: lote.id,
       responsableId: req.usuario.id
     });
 
     await Registro.create({
       tipo: 'cultivo',
       categoria: 'Creación de Cultivo',
-      descripcion: `Se creó el cultivo de ${cultivo.nombre} (${cultivo.tipo})`,
+      descripcion: `Se creó el cultivo de ${cultivo.nombre} (${cultivo.tipo}) en el lote ${lote.nombre}`,
       fecha: new Date(),
       cultivoId: cultivo.id,
+      fincaId: req.usuario ? req.usuario.fincaId : null,
+      loteId: lote.id,
       registradoPorId: req.usuario.id
     });
 
@@ -107,7 +162,12 @@ exports.crearCultivo = async (req, res) => {
 
 exports.actualizarCultivo = async (req, res) => {
   try {
-    const cultivo = await Cultivo.findByPk(req.params.id);
+    let donde = { id: req.params.id };
+    if (req.usuario && req.usuario.fincaId) {
+      donde.fincaId = req.usuario.fincaId;
+    }
+
+    const cultivo = await Cultivo.findOne({ where: donde });
 
     if (!cultivo) {
       return res.status(404).json({
@@ -116,11 +176,26 @@ exports.actualizarCultivo = async (req, res) => {
       });
     }
 
-    // 🚀 Detección dinámica general de cambios en cultivos
+    if (req.body.loteId && req.body.loteId !== cultivo.loteId) {
+      const lote = await Lote.findOne({
+        where: {
+          id: req.body.loteId,
+          ...(req.usuario && req.usuario.fincaId ? { fincaId: req.usuario.fincaId } : {}),
+          tipo: 'agricultura'
+        }
+      });
+      if (!lote) {
+        return res.status(400).json({
+          success: false,
+          message: 'El nuevo lote seleccionado no existe o no es de tipo agricultura.'
+        });
+      }
+    }
+
     let cambiosCultivo = [];
     const camposPermitidosCultivo = [
       'nombre', 'tipo', 'variedad', 'areaHectareas', 'ubicacion', 
-      'estado', 'fechaSiembra', 'fechaCosechaEstimada', 'observaciones'
+      'estado', 'fechaSiembra', 'fechaCosechaEstimada', 'observaciones', 'loteId'
     ];
 
     camposPermitidosCultivo.forEach(campo => {
@@ -147,6 +222,8 @@ exports.actualizarCultivo = async (req, res) => {
       descripcion: `Cultivo ${cultivo.nombre}: ${detalleCultivo}`,
       fecha: new Date(),
       cultivoId: cultivo.id,
+      fincaId: cultivo.fincaId,
+      loteId: cultivo.loteId,
       registradoPorId: req.usuario.id
     });
 
@@ -165,7 +242,12 @@ exports.actualizarCultivo = async (req, res) => {
 
 exports.eliminarCultivo = async (req, res) => {
   try {
-    const cultivo = await Cultivo.findByPk(req.params.id);
+    let donde = { id: req.params.id };
+    if (req.usuario && req.usuario.fincaId) {
+      donde.fincaId = req.usuario.fincaId;
+    }
+
+    const cultivo = await Cultivo.findOne({ where: donde });
 
     if (!cultivo) {
       return res.status(404).json({
@@ -175,6 +257,7 @@ exports.eliminarCultivo = async (req, res) => {
     }
 
     const nombreCultivo = cultivo.nombre;
+    const fincaId = cultivo.fincaId;
     await cultivo.destroy();
 
     await Registro.create({
@@ -182,6 +265,7 @@ exports.eliminarCultivo = async (req, res) => {
       categoria: 'Eliminación',
       descripcion: `Se eliminó el cultivo ${nombreCultivo}`,
       fecha: new Date(),
+      fincaId: fincaId,
       registradoPorId: req.usuario.id
     });
 

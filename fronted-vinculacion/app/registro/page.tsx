@@ -7,9 +7,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/context/AuthContext';
 import Input from '@/components/ui/Input';
-import { Select } from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
-import { FiUser, FiMail, FiPhone, FiLock, FiCreditCard } from 'react-icons/fi';
+import { FiUser, FiMail, FiPhone, FiLock, FiCreditCard, FiHome } from 'react-icons/fi';
 import { GiCorn } from 'react-icons/gi';
 import { registroSchema, RegistroSchemaType } from '../../schemas/registroSchema';
 export default function RegistroPage() {
@@ -27,11 +26,12 @@ export default function RegistroPage() {
     resolver: zodResolver(registroSchema),
     defaultValues: {
       nombre: '',
+      nombreFinca: '',
       cedula: '',
       email: '',
       telefono: '',
-      area: '',
-      tipo: 'trabajador',
+      area: 'administracion',
+      tipo: 'administrador',
       password: '',
       confirmPassword: '',
     },
@@ -116,26 +116,22 @@ export default function RegistroPage() {
                 {...register('telefono')}
               />
 
-              <Select
-                label="Área de Trabajo"
-                options={[
-                  { value: 'cultivos', label: 'Cultivos' },
-                  { value: 'ganaderia', label: 'Ganadería' },                  
-                  { value: 'administracion', label: 'Administración' },
-                ]}
-                error={errors.area?.message}
-                {...register('area')}
-              />
+              <div className="md:col-span-2">
+                <Input
+                  label="Nombre de la Finca"
+                  type="text"
+                  placeholder="Ej: Finca Lodana"
+                  icon={<FiHome className="h-5 w-5 text-gray-400" />}
+                  error={errors.nombreFinca?.message}
+                  {...register('nombreFinca')}
+                />
+              </div>
 
-              <Select
-                label="Tipo de Usuario"
-                options={[
-                  { value: 'trabajador', label: 'Trabajador' },
-                  { value: 'administrador', label: 'Administrador' },
-                ]}
-                error={errors.tipo?.message}
-                {...register('tipo')}
-              />
+              <div className="md:col-span-2 bg-emerald-50 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-800">
+                🔒 <strong>Registro exclusivo para Administradores:</strong> Como Administrador, registrarás tu cuenta y tu Finca. Los operadores (agricultores y ganaderos) se crean internamente desde el panel de control.
+              </div>
+              <input type="hidden" value="administracion" {...register('area')} />
+              <input type="hidden" value="administrador" {...register('tipo')} />
 
               <Input
                 label="Contraseña"

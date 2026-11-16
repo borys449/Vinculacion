@@ -1,4 +1,4 @@
-const { Ganado, Usuario, Registro } = require('../models');
+const { Ganado, Usuario, Registro, Lote } = require('../models');
 const { Op } = require('sequelize');
 const {
   saveAnimalPhoto,
@@ -41,13 +41,24 @@ exports.obtenerGanado = async (req, res) => {
       donde.proposito = proposito;
     }
 
+    if (req.usuario && req.usuario.fincaId) {
+      donde.fincaId = req.usuario.fincaId;
+    }
+
     const ganado = await Ganado.findAll({
       where: donde,
-      include: [{
-        model: Usuario,
-        as: 'responsable',
-        attributes: ['id', 'nombre', 'email', 'area']
-      }],
+      include: [
+        {
+          model: Usuario,
+          as: 'responsable',
+          attributes: ['id', 'nombre', 'email', 'area']
+        },
+        {
+          model: Lote,
+          as: 'lote',
+          attributes: ['id', 'nombre', 'tipo']
+        }
+      ],
       order: [['fechaRegistro', 'DESC']]
     });
 
@@ -146,6 +157,29 @@ exports.crearAnimal = async (req, res) => {
       });
     }
 
+    // Regla de negocio estricta: Animal amarrado obligatoriamente a un lote ganadero existente
+    if (!req.body.loteId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Orden estricto: Debe asociar obligatoriamente el animal a un lote ganadero existente.'
+      });
+    }
+
+    const lote = await Lote.findOne({
+      where: {
+        id: req.body.loteId,
+        ...(req.usuario && req.usuario.fincaId ? { fincaId: req.usuario.fincaId } : {}),
+        tipo: 'ganaderia'
+      }
+    });
+
+    if (!lote) {
+      return res.status(400).json({
+        success: false,
+        message: 'El lote seleccionado no existe en su finca o no pertenece a la rama ganadera.'
+      });
+    }
+
     if (req.file) {
       fotoGuardada = await saveAnimalPhoto(req.file);
     }
@@ -153,6 +187,8 @@ exports.crearAnimal = async (req, res) => {
     const animal = await Ganado.create({
       ...req.body,
       ...(fotoGuardada ? { foto: fotoGuardada } : {}),
+      fincaId: req.usuario ? req.usuario.fincaId : lote.fincaId,
+      loteId: lote.id,
       responsableId: req.usuario.id
     });
     animalCreado = true;
@@ -160,9 +196,11 @@ exports.crearAnimal = async (req, res) => {
     await Registro.create({
       tipo: 'ganado',
       categoria: 'Creación de Animal',
-      descripcion: `Se registró el animal ${animal.identificacion} (${animal.tipo} - ${animal.raza})`,
+      descripcion: `Se registró el animal ${animal.identificacion} (${animal.tipo} - ${animal.raza}) en el lote ${lote.nombre}`,
       fecha: new Date(),
       ganadoId: animal.id,
+      fincaId: req.usuario ? req.usuario.fincaId : null,
+      loteId: lote.id,
       registradoPorId: req.usuario.id
     });
 
@@ -187,10 +225,30 @@ exports.actualizarAnimal = async (req, res) => {
   let fotoGuardada;
   let fotoPersistida = false;
   try {
-    const animal = await Ganado.findByPk(req.params.id);
+    let dondeAnimal = { id: req.params.id };
+    if (req.usuario && req.usuario.fincaId) {
+      dondeAnimal.fincaId = req.usuario.fincaId;
+    }
+    const animal = await Ganado.findOne({ where: dondeAnimal });
 
     if (!animal) {
       return res.status(404).json({ success: false, message: 'Animal no encontrado' });
+    }
+
+    if (req.body.loteId && req.body.loteId !== animal.loteId) {
+      const lote = await Lote.findOne({
+        where: {
+          id: req.body.loteId,
+          ...(req.usuario && req.usuario.fincaId ? { fincaId: req.usuario.fincaId } : {}),
+          tipo: 'ganaderia'
+        }
+      });
+      if (!lote) {
+        return res.status(400).json({
+          success: false,
+          message: 'El nuevo lote seleccionado no existe o no es de tipo ganadería.'
+        });
+      }
     }
 
     // 🚀 Normalizar estado de salud al formato exacto del ENUM de la base de datos ('en_recuperacion')
@@ -334,7 +392,11 @@ exports.obtenerFotoAnimal = async (req, res) => {
 
 exports.eliminarAnimal = async (req, res) => {
   try {
-    const animal = await Ganado.findByPk(req.params.id);
+    let dondeAnimal = { id: req.params.id };
+    if (req.usuario && req.usuario.fincaId) {
+      dondeAnimal.fincaId = req.usuario.fincaId;
+    }
+    const animal = await Ganado.findOne({ where: dondeAnimal });
 
     if (!animal) {
       return res.status(404).json({
@@ -345,6 +407,7 @@ exports.eliminarAnimal = async (req, res) => {
 
     const ident = animal.identificacion;
     const foto = animal.foto;
+    const fincaId = animal.fincaId;
     await animal.destroy();
     if (foto) {
       await deleteAnimalPhoto(foto);
@@ -355,6 +418,7 @@ exports.eliminarAnimal = async (req, res) => {
       categoria: 'Eliminación',
       descripcion: `Se eliminó el registro del animal ${ident}`,
       fecha: new Date(),
+      fincaId: fincaId,
       registradoPorId: req.usuario.id
     });
 

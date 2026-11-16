@@ -1,4 +1,4 @@
-const { Usuario } = require('../models');
+const { Usuario, Finca } = require('../models');
 const jwt = require('jsonwebtoken');
 const { Op } = require('sequelize');
 const bcrypt = require('bcrypt');
@@ -57,16 +57,45 @@ exports.registro = async (req, res) => {
       });
     }
 
-    // Crear usuario
+    // Regla de seguridad y multi-tenancy: Quitar autorregistro público de operadores. Solo Administrador.
+    if (tipo && tipo !== 'administrador') {
+      return res.status(403).json({
+        success: false,
+        message: 'El registro público está habilitado exclusivamente para Administradores de Finca. Los operadores (agricultores y ganaderos) deben ser registrados internamente por su Administrador.',
+      });
+    }
+
+    // Crear usuario administrador
     const usuario = await Usuario.create({
       nombre,
       cedula,
       email,
       telefono,
-      area,
-      tipo,
+      area: 'administracion',
+      tipo: 'administrador',
       password,
     });
+
+    // Crear finca propia para el nuevo Administrador
+    let finca = null;
+    if (Finca && typeof Finca.create === 'function') {
+      try {
+        const nombreFinca = (req.body.nombreFinca && typeof req.body.nombreFinca === 'string' && req.body.nombreFinca.trim()) 
+          ? req.body.nombreFinca.trim() 
+          : `Finca de ${nombre}`;
+
+        finca = await Finca.create({
+          nombre: nombreFinca,
+          poligonoPerimetro: null,
+          propietarioId: usuario.id,
+        });
+        if (typeof usuario.update === 'function') {
+          await usuario.update({ fincaId: finca.id });
+        }
+      } catch (fincaErr) {
+        console.warn('Aviso: No se pudo auto-crear la finca:', fincaErr.message);
+      }
+    }
 
     // Generar token
     const token = generarToken(usuario.id);
@@ -74,16 +103,22 @@ exports.registro = async (req, res) => {
     // 🍪 Inyectar la cookie en la respuesta HTTP
     res.cookie('token', token, cookieOptions);
 
+    const dataRes = {
+      id: usuario.id,
+      nombre: usuario.nombre,
+      email: usuario.email,
+      tipo: usuario.tipo,
+      area: usuario.area,
+    };
+    if (usuario.fincaId !== undefined || finca) {
+      dataRes.fincaId = usuario.fincaId || finca?.id;
+      dataRes.finca = finca ? { id: finca.id, nombre: finca.nombre, poligonoPerimetro: finca.poligonoPerimetro } : null;
+    }
+
     return res.status(201).json({
       success: true,
       message: 'Usuario registrado exitosamente',
-      data: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        email: usuario.email,
-        tipo: usuario.tipo,
-        area: usuario.area,
-      },
+      data: dataRes,
     });
   } catch (error) {
     return res.status(400).json({
@@ -138,17 +173,30 @@ exports.login = async (req, res) => {
     // 🍪 Inyectar la cookie en la respuesta HTTP
     res.cookie('token', token, cookieOptions);
 
+    const dataRes = {
+      id: usuario.id,
+      nombre: usuario.nombre,
+      email: usuario.email,
+      tipo: usuario.tipo,
+      area: usuario.area,
+      cedula: usuario.cedula,
+    };
+
+    if (usuario.fincaId !== undefined) {
+      let finca = null;
+      if (Finca && typeof Finca.findByPk === 'function' && usuario.fincaId) {
+        try {
+          finca = await Finca.findByPk(usuario.fincaId);
+        } catch (e) {}
+      }
+      dataRes.fincaId = usuario.fincaId;
+      dataRes.finca = finca ? { id: finca.id, nombre: finca.nombre, poligonoPerimetro: finca.poligonoPerimetro } : null;
+    }
+
     return res.status(200).json({
       success: true,
       message: 'Login exitoso',
-      data: {
-        id: usuario.id,
-        nombre: usuario.nombre,
-        email: usuario.email,
-        tipo: usuario.tipo,
-        area: usuario.area,
-        cedula: usuario.cedula,
-      },
+      data: dataRes,
     });
   } catch (error) {
     return res.status(400).json({
@@ -163,9 +211,20 @@ exports.login = async (req, res) => {
 // @access  Private
 exports.getMe = async (req, res) => {
   try {
-    const usuario = await Usuario.findByPk(req.usuario.id, {
+    const queryOptions = {
       attributes: { exclude: ['password'] },
-    });
+    };
+    if (Finca && typeof Finca.findByPk === 'function') {
+      queryOptions.include = [
+        {
+          model: Finca,
+          as: 'finca',
+          attributes: ['id', 'nombre', 'poligonoPerimetro'],
+        },
+      ];
+    }
+
+    const usuario = await Usuario.findByPk(req.usuario.id, queryOptions);
 
     return res.status(200).json({
       success: true,

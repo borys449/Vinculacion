@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const registroSchema = z.object({
   nombre: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
+  nombreFinca: z.string().min(3, 'El nombre de la finca debe tener al menos 3 caracteres'),
   cedula: z.string().length(10, 'La cédula ecuatoriana debe tener exactamente 10 dígitos').regex(/^\d+$/, 'La cédula solo debe contener números'),
   email: z.string().email('Ingresa un correo electrónico válido'),
   telefono: z.string().min(9, 'El teléfono debe tener al menos 9 dígitos').regex(/^\d+$/, 'El teléfono solo debe contener números'),

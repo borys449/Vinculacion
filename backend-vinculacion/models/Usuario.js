@@ -67,6 +67,16 @@ const Usuario = sequelize.define('Usuario', {
   activo: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
+  },
+  fincaId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'fincas',
+      key: 'id'
+    },
+    onDelete: 'SET NULL',
+    onUpdate: 'CASCADE'
   }
 }, {
   tableName: 'usuarios',

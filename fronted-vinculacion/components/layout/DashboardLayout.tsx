@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
@@ -12,6 +13,17 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    const typedUser = user as any;
+    if (typedUser && (typedUser.tipo === 'administrador' || typedUser.role === 'admin')) {
+      const fincaRegistrada = typedUser.finca?.poligonoPerimetro;
+      if (!fincaRegistrada && typeof window !== 'undefined' && window.location.pathname !== '/admin/configurar-mapa') {
+        router.push('/admin/configurar-mapa');
+      }
+    }
+  }, [user, router]);
 
   return (
     <div className="min-h-screen bg-white">

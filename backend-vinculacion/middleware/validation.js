@@ -78,6 +78,12 @@ exports.validateUsuario = [
     .isLength({ min: 3, max: 255 })
     .withMessage('El nombre debe tener al menos 3 caracteres'),
 
+  body('nombreFinca')
+    .optional({ checkFalsy: true })
+    .trim()
+    .isLength({ min: 3, max: 255 })
+    .withMessage('El nombre de la finca debe tener al menos 3 caracteres'),
+
   body('cedula')
     .notEmpty()
     .withMessage('La cédula es requerida')

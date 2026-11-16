@@ -1,12 +1,13 @@
 const { Usuario } = require('../models');
 const { Op } = require('sequelize');
 
-// @desc    Obtener todos los usuarios
+// @desc    Obtener todos los usuarios de la finca del administrador
 // @route   GET /api/usuarios
 // @access  Private/Admin
 exports.obtenerUsuarios = async (req, res) => {
   try {
     const usuarios = await Usuario.findAll({
+      where: { fincaId: req.usuario.fincaId },
       attributes: { exclude: ['password'] },
       order: [['fechaRegistro', 'DESC']],
     });
@@ -24,12 +25,71 @@ exports.obtenerUsuarios = async (req, res) => {
   }
 };
 
+// @desc    Crear un nuevo operador interno (hereda fincaId)
+// @route   POST /api/usuarios
+// @access  Private/Admin
+exports.crearOperador = async (req, res) => {
+  try {
+    const { nombre, cedula, email, telefono, area, password } = req.body;
+
+    if (!nombre || !cedula || !email || !telefono || !area || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Todos los campos son obligatorios: nombre, cédula, email, teléfono, área y contraseña.',
+      });
+    }
+
+    const usuarioExiste = await Usuario.findOne({
+      where: {
+        [Op.or]: [{ email }, { cedula }],
+      },
+    });
+
+    if (usuarioExiste) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ya existe un usuario con este email o cédula',
+      });
+    }
+
+    const nuevoOperador = await Usuario.create({
+      nombre,
+      cedula,
+      email,
+      telefono,
+      area,
+      tipo: 'trabajador',
+      password,
+      activo: true,
+      fincaId: req.usuario.fincaId,
+    });
+
+    const operadorSinPassword = nuevoOperador.toJSON();
+    delete operadorSinPassword.password;
+
+    res.status(201).json({
+      success: true,
+      message: 'Operador creado exitosamente y vinculado a la finca',
+      data: operadorSinPassword,
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
 // @desc    Obtener un usuario
 // @route   GET /api/usuarios/:id
 // @access  Private/Admin
 exports.obtenerUsuario = async (req, res) => {
   try {
-    const usuario = await Usuario.findByPk(req.params.id, {
+    const usuario = await Usuario.findOne({
+      where: {
+        id: req.params.id,
+        fincaId: req.usuario.fincaId,
+      },
       attributes: { exclude: ['password'] },
     });
 
@@ -57,7 +117,12 @@ exports.obtenerUsuario = async (req, res) => {
 // @access  Private/Admin
 exports.actualizarUsuario = async (req, res) => {
   try {
-    const usuario = await Usuario.findByPk(req.params.id);
+    const usuario = await Usuario.findOne({
+      where: {
+        id: req.params.id,
+        fincaId: req.usuario.fincaId,
+      },
+    });
 
     if (!usuario) {
       return res.status(404).json({
@@ -68,11 +133,11 @@ exports.actualizarUsuario = async (req, res) => {
 
     // No permitir actualizar la contraseña desde aquí
     delete req.body.password;
+    delete req.body.fincaId; // No transferir finca arbitrariamente
 
     await usuario.update(req.body);
     await usuario.reload();
 
-    // Excluir contraseña de la respuesta
     const usuarioSinPassword = usuario.toJSON();
     delete usuarioSinPassword.password;
 
@@ -94,7 +159,12 @@ exports.actualizarUsuario = async (req, res) => {
 // @access  Private/Admin
 exports.eliminarUsuario = async (req, res) => {
   try {
-    const usuario = await Usuario.findByPk(req.params.id);
+    const usuario = await Usuario.findOne({
+      where: {
+        id: req.params.id,
+        fincaId: req.usuario.fincaId,
+      },
+    });
 
     if (!usuario) {
       return res.status(404).json({
@@ -103,7 +173,6 @@ exports.eliminarUsuario = async (req, res) => {
       });
     }
 
-    // No permitir eliminar al propio usuario
     if (usuario.id === req.usuario.id) {
       return res.status(400).json({
         success: false,
@@ -111,7 +180,6 @@ exports.eliminarUsuario = async (req, res) => {
       });
     }
 
-    // Desactivar usuario en lugar de eliminar
     await usuario.update({ activo: false });
 
     res.status(200).json({
@@ -141,7 +209,12 @@ exports.cambiarPassword = async (req, res) => {
       });
     }
 
-    const usuario = await Usuario.findByPk(req.params.id);
+    const usuario = await Usuario.findOne({
+      where: {
+        id: req.params.id,
+        fincaId: req.usuario.fincaId,
+      },
+    });
 
     if (!usuario) {
       return res.status(404).json({

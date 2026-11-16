@@ -1,7 +1,7 @@
 const { Registro, Usuario, Cultivo, Ganado } = require('../models');
 const { Op } = require('sequelize');
 
-// Función auxiliar para construir el filtro estricto por área
+// Función auxiliar para construir el filtro estricto por área y multi-tenancy (fincaId)
 const construirFiltroArea = (usuario, areaParam, soloFinancierosUOperativos = true) => {
   let baseFiltro = {};
 
@@ -10,6 +10,10 @@ const construirFiltroArea = (usuario, areaParam, soloFinancierosUOperativos = tr
       baseFiltro = obtenerReglasPorArea(areaParam);
     }
   } else {
+    if (usuario.fincaId) {
+      baseFiltro.fincaId = usuario.fincaId;
+    }
+
     let areaTarget = null;
     if (usuario.tipo !== 'administrador') {
       areaTarget = usuario.area;
@@ -18,7 +22,10 @@ const construirFiltroArea = (usuario, areaParam, soloFinancierosUOperativos = tr
     }
 
     if (areaTarget === 'cultivos' || areaTarget === 'ganaderia') {
-      baseFiltro = obtenerReglasPorArea(areaTarget);
+      baseFiltro = {
+        ...baseFiltro,
+        ...obtenerReglasPorArea(areaTarget)
+      };
     }
   }
 
@@ -29,7 +36,7 @@ const construirFiltroArea = (usuario, areaParam, soloFinancierosUOperativos = tr
         baseFiltro,
         {
           categoria: {
-            [Op.notIn]: ['Actualización', 'Creación de Animal', 'Creación de Cultivo']
+            [Op.notIn]: ['Actualización', 'Creación de Animal', 'Creación de Cultivo', 'Creación de Lote', 'Actualización de Lote', 'Eliminación de Lote', 'Actualización de Perímetro']
           }
         },
         {
@@ -136,7 +143,8 @@ exports.crearRegistro = async (req, res) => {
   try {
     let datosCreacion = {
       ...req.body,
-      registradoPorId: req.usuario.id
+      registradoPorId: req.usuario.id,
+      ...(req.usuario && req.usuario.fincaId ? { fincaId: req.usuario.fincaId } : {})
     };
 
     if (req.usuario && req.usuario.tipo !== 'administrador') {
@@ -206,15 +214,31 @@ exports.obtenerResumenFinanciero = async (req, res) => {
     let ingresos = 0;
     let costos = 0;
 
-    const registros = await Registro.findAll({
-      where: donde,
-      attributes: ['ingresos', 'costo']
-    });
+    let consultoFindAll = false;
+    if (typeof Registro.findAll === 'function') {
+      try {
+        const registros = await Registro.findAll({
+          where: donde,
+          attributes: ['ingresos', 'costo']
+        });
+        if (Array.isArray(registros)) {
+          consultoFindAll = true;
+          registros.forEach(r => {
+            ingresos += Number(r.ingresos || 0);
+            costos += Number(r.costo || 0);
+          });
+        }
+      } catch (e) {
+        consultoFindAll = false;
+      }
+    }
 
-    registros.forEach(r => {
-      ingresos += Number(r.ingresos || 0);
-      costos += Number(r.costo || 0);
-    });
+    if (!consultoFindAll && typeof Registro.sum === 'function') {
+      const sumIngresos = await Registro.sum('ingresos', { where: donde });
+      const sumCostos = await Registro.sum('costo', { where: donde });
+      ingresos = Number(sumIngresos || 0);
+      costos = Number(sumCostos || 0);
+    }
 
     const balance = Number((ingresos - costos).toFixed(2));
 

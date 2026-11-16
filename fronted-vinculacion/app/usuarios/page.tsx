@@ -37,8 +37,19 @@ export default function UsuariosPage() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [crearModalOpen, setCrearModalOpen] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [editingUsuario, setEditingUsuario] = useState<Usuario | null>(null);
+  const [nuevoOperador, setNuevoOperador] = useState({
+    nombre: '',
+    cedula: '',
+    email: '',
+    telefono: '',
+    area: 'cultivos',
+    password: '',
+  });
+  const [crearError, setCrearError] = useState<string | null>(null);
+  const [crearLoading, setCrearLoading] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '',
     email: '',
@@ -67,6 +78,30 @@ export default function UsuariosPage() {
       fetchUsuarios();
     }
   }, [authLoading, user]);
+
+  const handleCrearOperador = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setCrearError(null);
+    setCrearLoading(true);
+    try {
+      await usuarioService.createOperador(nuevoOperador);
+      fetchUsuarios();
+      setCrearModalOpen(false);
+      setNuevoOperador({
+        nombre: '',
+        cedula: '',
+        email: '',
+        telefono: '',
+        area: 'cultivos',
+        password: '',
+      });
+      alert('Operador creado y vinculado a la finca exitosamente');
+    } catch (err: any) {
+      setCrearError(err.response?.data?.message || err.message || 'Error al crear operador');
+    } finally {
+      setCrearLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,12 +270,18 @@ export default function UsuariosPage() {
             </div>
           ) : (
             <>
-              <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  <strong>Nota:</strong> Los nuevos usuarios deben registrarse
-                  desde la página de registro. Aquí solo puedes editar usuarios
-                  existentes, cambiar contraseñas o desactivarlos.
-                </p>
+              <div className="mb-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-green-50 border border-green-200 p-4 rounded-xl">
+                <div>
+                  <p className="text-sm font-semibold text-green-900">
+                    Control de Operadores y Multi-tenancy
+                  </p>
+                  <p className="text-xs text-green-700">
+                    Como Administrador, crea aquí tus operadores (agricultores y ganaderos). Heredarán automáticamente el identificador de tu finca.
+                  </p>
+                </div>
+                <Button variant="primary" onClick={() => setCrearModalOpen(true)}>
+                  + Registrar Nuevo Operador
+                </Button>
               </div>
               <Table columns={columns} data={usuarios} />
             </>
@@ -384,6 +425,78 @@ export default function UsuariosPage() {
               </Button>
               <Button type="submit" variant="primary">
                 Cambiar Contraseña
+              </Button>
+            </div>
+          </form>
+        </Modal>
+        {/* Modal Crear Operador */}
+        <Modal
+          isOpen={crearModalOpen}
+          onClose={() => setCrearModalOpen(false)}
+          title="Registrar Operador Interno de la Finca"
+          size="md"
+        >
+          {crearError && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+              {crearError}
+            </div>
+          )}
+          <form onSubmit={handleCrearOperador} className="space-y-4">
+            <Input
+              label="Nombre Completo"
+              type="text"
+              value={nuevoOperador.nombre}
+              onChange={(e) => setNuevoOperador({ ...nuevoOperador, nombre: e.target.value })}
+              required
+            />
+            <Input
+              label="Cédula"
+              type="text"
+              value={nuevoOperador.cedula}
+              onChange={(e) => setNuevoOperador({ ...nuevoOperador, cedula: e.target.value })}
+              required
+            />
+            <Input
+              label="Email"
+              type="email"
+              value={nuevoOperador.email}
+              onChange={(e) => setNuevoOperador({ ...nuevoOperador, email: e.target.value })}
+              required
+            />
+            <Input
+              label="Teléfono"
+              type="tel"
+              value={nuevoOperador.telefono}
+              onChange={(e) => setNuevoOperador({ ...nuevoOperador, telefono: e.target.value })}
+              required
+            />
+            <Select
+              label="Área de Operación"
+              value={nuevoOperador.area}
+              onChange={(e) => setNuevoOperador({ ...nuevoOperador, area: e.target.value })}
+              options={[
+                { value: 'cultivos', label: 'Agricultura (Cultivos)' },
+                { value: 'ganaderia', label: 'Ganadería' },
+                { value: 'mantenimiento', label: 'Mantenimiento' },
+                { value: 'investigacion', label: 'Investigación' },
+              ]}
+              required
+            />
+            <Input
+              label="Contraseña Temporal"
+              type="password"
+              value={nuevoOperador.password}
+              onChange={(e) => setNuevoOperador({ ...nuevoOperador, password: e.target.value })}
+              placeholder="Mínimo 6 caracteres"
+              required
+            />
+
+            <div className="flex justify-end space-x-3 pt-4">
+              <Button type="button" variant="secondary" onClick={() => setCrearModalOpen(false)}>
+                Cancelar
+              </Button>
+              <Button type="submit" variant="primary" loading={crearLoading}>
+                Registrar Operador
               </Button>
             </div>
           </form>

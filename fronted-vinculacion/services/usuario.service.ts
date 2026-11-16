@@ -12,6 +12,11 @@ export const usuarioService = {
     return response.data;
   },
 
+  createOperador: async (data: any) => {
+    const response = await api.post('/usuarios', data);
+    return response.data;
+  },
+
   update: async (id: number, data: Partial<Usuario>) => {
     const response = await api.put(`/usuarios/${id}`, data);
     return response.data;

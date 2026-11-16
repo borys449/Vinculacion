@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import { FiHome, FiUsers, FiFileText, FiX, FiSettings } from 'react-icons/fi';
+import { FiHome, FiUsers, FiFileText, FiX, FiSettings, FiMapPin } from 'react-icons/fi';
 import { GiCorn, GiCow } from 'react-icons/gi';
 
 interface SidebarProps {
@@ -32,6 +32,12 @@ export default function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       href: '/ganado',
       icon: GiCow,
       show: isAdmin || isGanaderia,
+    },
+    {
+      name: 'Mapa y Lotes',
+      href: '/admin/configurar-mapa',
+      icon: FiMapPin,
+      show: true,
     },
     { name: 'Registros', href: '/registros', icon: FiFileText, show: true },
     { name: 'Usuarios', href: '/usuarios', icon: FiUsers, show: isAdmin },

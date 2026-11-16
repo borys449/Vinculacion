@@ -7,6 +7,7 @@ export interface LoginData {
 
 export interface RegistroData {
   nombre: string;
+  nombreFinca?: string;
   cedula: string;
   email: string;
   telefono: string;
@@ -31,6 +32,12 @@ export interface Usuario {
   tipo: string;
   activo: boolean;
   fechaRegistro: string;
+  fincaId?: number;
+  finca?: {
+    id: number;
+    nombre: string;
+    poligonoPerimetro?: any;
+  } | null;
 }
 
 export const authService = {

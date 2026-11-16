@@ -4,6 +4,7 @@ const { protect, autorizar } = require('../middleware/auth');
 const { validateId, validate } = require('../middleware/validation');
 const {
   obtenerUsuarios,
+  crearOperador,
   obtenerUsuario,
   actualizarUsuario,
   eliminarUsuario,
@@ -14,7 +15,9 @@ const {
 router.use(protect);
 router.use(autorizar('administrador'));
 
-router.route('/').get(obtenerUsuarios);
+router.route('/')
+  .get(obtenerUsuarios)
+  .post(crearOperador);
 
 router
   .route('/:id')

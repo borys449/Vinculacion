@@ -83,6 +83,8 @@ app.use('/api/usuarios', require('./routes/usuarios'));
 app.use('/api/cultivos', require('./routes/cultivos'));
 app.use('/api/ganado', require('./routes/ganado'));
 app.use('/api/registros', require('./routes/registros'));
+app.use('/api/fincas', require('./routes/fincas'));
+app.use('/api/lotes', require('./routes/lotes'));
 
 // Ruta de prueba
 app.get('/', (req, res) => {
@@ -134,60 +136,12 @@ if (process.env.NODE_ENV !== 'test') {
         console.log('======================================================\n');
       }
 
-      // 🚀 INSERCIÓN AUTOMÁTICA DE USUARIOS DE PRUEBA DESDE EL .ENV
+      // 🚀 INICIALIZACIÓN DE FINCA BASE LODANA, PERÍMETRO Y VINCULACIÓN MULTI-TENANCY
       try {
-        const bcrypt = require('bcrypt');
-        const usuariosPrueba = [
-          {
-            nombre: process.env.ADMIN_NOMBRE || process.env.admin_name,
-            cedula: process.env.ADMIN_CEDULA || '0000000000',
-            email: process.env.ADMIN_EMAIL || process.env.admin_email,
-            telefono: process.env.ADMIN_TELEFONO || '0999999999',
-            area: 'administracion',
-            tipo: 'administrador',
-            passwordPlana: process.env.ADMIN_PASSWORD || process.env.admin_password
-          },
-          {
-            nombre: process.env.CULTIVOS_NOMBRE,
-            cedula: process.env.CULTIVOS_CEDULA,
-            email: process.env.CULTIVOS_EMAIL,
-            telefono: process.env.CULTIVOS_TELEFONO,
-            area: 'cultivos',
-            tipo: 'trabajador',
-            passwordPlana: process.env.CULTIVOS_PASSWORD
-          },
-          {
-            nombre: process.env.GANADERIA_NOMBRE,
-            cedula: process.env.GANADERIA_CEDULA,
-            email: process.env.GANADERIA_EMAIL,
-            telefono: process.env.GANADERIA_TELEFONO,
-            area: 'ganaderia',
-            tipo: 'trabajador',
-            passwordPlana: process.env.GANADERIA_PASSWORD
-          }
-        ];
-
-        for (const u of usuariosPrueba) {
-          if (u.email && u.passwordPlana) {
-            const existe = await db.Usuario.findOne({ where: { email: u.email } });
-            if (!existe) {
-              const hashedPassword = await bcrypt.hash(u.passwordPlana, 10);
-              await db.Usuario.create({
-                nombre: u.nombre || 'Usuario Test',
-                cedula: u.cedula || '0000000000',
-                email: u.email,
-                telefono: u.telefono || '0000000000',
-                area: u.area,
-                tipo: u.tipo,
-                password: hashedPassword,
-                activo: true
-              });
-              console.log(`--- Usuario de prueba creado automáticamente: ${u.nombre} (${u.email}) ---`);
-            }
-          }
-        }
+        const { initFincaBase } = require('./scripts/initFincaBase');
+        await initFincaBase();
       } catch (seedError) {
-        console.log('Aviso: No se pudieron crear los usuarios de prueba automáticamente:', seedError.message);
+        console.log('Aviso: No se pudo inicializar la finca base:', seedError.message);
       }
     });
   }

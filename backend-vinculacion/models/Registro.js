@@ -8,7 +8,7 @@ const Registro = sequelize.define('Registro', {
     autoIncrement: true
   },
   tipo: {
-    type: DataTypes.ENUM('cultivo', 'ganado', 'mantenimiento', 'produccion', 'venta', 'leche', 'otro'),
+    type: DataTypes.STRING(50),
     allowNull: false,
     validate: {
       notEmpty: true
@@ -92,6 +92,26 @@ const Registro = sequelize.define('Registro', {
       key: 'id'
     },
     onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE'
+  },
+  fincaId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'fincas',
+      key: 'id'
+    },
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+  },
+  loteId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'lotes',
+      key: 'id'
+    },
+    onDelete: 'SET NULL',
     onUpdate: 'CASCADE'
   }
 }, {

@@ -58,6 +58,10 @@ export const ganadoSchema = z.object({
     .or(z.nan()),
   observaciones: z.string().trim().optional(),
   activo: z.boolean(),
+  loteId: z
+    .coerce
+    .number({ message: 'El lote ganadero es obligatorio' })
+    .positive('Debe seleccionar obligatoriamente un lote ganadero válido'),
 }).superRefine((data, context) => {
   if (data.tipo !== 'oviparo') return;
 

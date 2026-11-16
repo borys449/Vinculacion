@@ -18,6 +18,7 @@ import {
   cultivoService,
   Cultivo,
 } from '@/services/cultivo.service';
+import { fincaService, Lote } from '@/services/finca.service';
 import { FiPlus, FiEdit, FiTrash2, FiSearch } from 'react-icons/fi';
 import { format } from 'date-fns';
 
@@ -43,6 +44,7 @@ export default function CultivosPage() {
   }, [user, authLoading, router]);
 
   const [cultivos, setCultivos] = useState<Cultivo[]>([]);
+  const [lotes, setLotes] = useState<Lote[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCultivo, setEditingCultivo] = useState<Cultivo | null>(null);
@@ -61,6 +63,7 @@ export default function CultivosPage() {
       area: 0,
       unidad: 'hectareas',
       ubicacion: '',
+      loteId: undefined,
       fechaSiembra: '',
       estado: 'siembra',
       fechaCosechaEstimada: '',
@@ -84,6 +87,12 @@ export default function CultivosPage() {
 
   useEffect(() => {
     if (!authLoading && user && (user.tipo === 'administrador' || user.area === 'cultivos')) {
+      fincaService.getLotes().then((res) => {
+        if (res.success) {
+          setLotes(res.data.filter((l: any) => l.tipo === 'agricultura'));
+        }
+      }).catch(console.error);
+
       const delayDebounceFn = setTimeout(() => {
         fetchCultivos();
       }, 300);
@@ -134,6 +143,7 @@ export default function CultivosPage() {
       area: cultivo.area,
       unidad: cultivo.unidad as any,
       ubicacion: cultivo.ubicacion,
+      loteId: (cultivo as any).loteId || undefined,
       fechaSiembra: cultivo.fechaSiembra ? cultivo.fechaSiembra.split('T')[0] : '',
       fechaCosechaEstimada: cultivo.fechaCosechaEstimada ? cultivo.fechaCosechaEstimada.split('T')[0] : '',
       estado: cultivo.estado as any,
@@ -152,6 +162,7 @@ export default function CultivosPage() {
       area: 0,
       unidad: 'hectareas',
       ubicacion: '',
+      loteId: undefined,
       fechaSiembra: '',
       estado: 'siembra',
       fechaCosechaEstimada: '',
@@ -315,6 +326,17 @@ export default function CultivosPage() {
                 label="Ubicación"
                 error={errors.ubicacion?.message}
                 {...register('ubicacion')}
+                required
+              />
+
+              <Select
+                label="Lote Agrícola (Obligatorio)"
+                error={errors.loteId?.message}
+                options={[
+                  { value: '', label: lotes.length === 0 ? 'Sin lotes agrícolas disponibles (cree uno primero)' : 'Seleccione un lote...' },
+                  ...lotes.map((l) => ({ value: String(l.id), label: `${l.nombre} (ID: ${l.id})` })),
+                ]}
+                {...register('loteId')}
                 required
               />
 

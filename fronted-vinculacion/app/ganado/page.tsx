@@ -23,6 +23,7 @@ import {
   RegistroLechero,
   ResumenControlLechero,
 } from '@/services/ganado.service';
+import { fincaService, Lote } from '@/services/finca.service';
 import {
   PROPOSITOS_BOVINO,
   RAZAS_POR_PROPOSITO,
@@ -95,6 +96,7 @@ export default function GanadoPage() {
 
   // Estados de datos
   const [ganado, setGanado] = useState<Ganado[]>([]);
+  const [lotesGanaderos, setLotesGanaderos] = useState<Lote[]>([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAnimal, setEditingAnimal] = useState<Ganado | null>(null);
@@ -210,6 +212,7 @@ export default function GanadoPage() {
       pesoActual: 0,
       observaciones: '',
       activo: true,
+      loteId: undefined,
     },
   });
 
@@ -323,6 +326,11 @@ export default function GanadoPage() {
 
   useEffect(() => {
     if (!authLoading && user && (user.tipo === 'administrador' || user.area === 'ganaderia')) {
+      fincaService.getLotes().then((res) => {
+        if (res.success) {
+          setLotesGanaderos(res.data.filter((l: any) => l.tipo === 'ganaderia'));
+        }
+      }).catch(console.error);
       // These effects fetch remote data; their state updates occur after the requests resolve.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       void fetchGanado();
@@ -445,6 +453,7 @@ export default function GanadoPage() {
       estado: animal.estado,
       observaciones: animal.observaciones || '',
       activo: animal.activo,
+      loteId: (animal as any).loteId || undefined,
     });
     setModalOpen(true);
   };
@@ -468,6 +477,7 @@ export default function GanadoPage() {
       pesoActual: 0,
       observaciones: '',
       activo: true,
+      loteId: undefined,
     });
     setModalOpen(true);
   };
@@ -1178,6 +1188,17 @@ export default function GanadoPage() {
                   {...register('identificacion')}
                   readOnly={!editingAnimal}
                   className={!editingAnimal ? 'bg-gray-50 cursor-not-allowed font-semibold text-gray-600' : ''}
+                  required
+                />
+
+                <Select
+                  label="Lote Ganadero (Obligatorio)"
+                  error={errors.loteId?.message}
+                  options={[
+                    { value: '', label: lotesGanaderos.length === 0 ? 'Sin lotes ganaderos (cree uno primero)' : 'Seleccione un lote ganadero...' },
+                    ...lotesGanaderos.map((l) => ({ value: String(l.id), label: `${l.nombre} (ID: ${l.id})` })),
+                  ]}
+                  {...register('loteId')}
                   required
                 />
 

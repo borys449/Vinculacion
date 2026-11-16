@@ -104,6 +104,26 @@ const Ganado = sequelize.define('Ganado', {
   activo: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
+  },
+  fincaId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'fincas',
+      key: 'id'
+    },
+    onDelete: 'CASCADE',
+    onUpdate: 'CASCADE'
+  },
+  loteId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'lotes',
+      key: 'id'
+    },
+    onDelete: 'RESTRICT',
+    onUpdate: 'CASCADE'
   }
 }, {
   tableName: 'ganado',
