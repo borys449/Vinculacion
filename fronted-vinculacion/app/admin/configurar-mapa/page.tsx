@@ -78,6 +78,45 @@ export default function ConfigurarMapaPage() {
     }
   };
 
+  const handleActualizarLote = async (id: number, data: Partial<Lote>) => {
+    try {
+      setMensaje(null);
+      const res = await fincaService.actualizarLote(id, data);
+      if (res.success) {
+        setLotes((prev) => prev.map((l) => (l.id === id ? res.data : l)));
+        setMensaje({ tipo: 'ok', texto: `Lote '${res.data.nombre}' actualizado exitosamente.` });
+      }
+    } catch (err: any) {
+      setMensaje({
+        tipo: 'error',
+        texto: err.response?.data?.message || 'Error al actualizar el lote'
+      });
+    }
+  };
+
+  const handleEliminarMapaCompleto = async () => {
+    try {
+      setMensaje(null);
+      const res = await fincaService.eliminarMapaCompleto();
+      if (res.success) {
+        setFinca((prev) => (prev ? { ...prev, poligonoPerimetro: null } : null));
+        setLotes([]);
+        if (finca?.id) {
+          localStorage.removeItem(`finca_principal_bounds_${finca.id}`);
+        }
+        setMensaje({
+          tipo: 'ok',
+          texto: 'Mapa completo y lotes eliminados con éxito. Ahora puedes trazar la finca desde cero.'
+        });
+      }
+    } catch (err: any) {
+      setMensaje({
+        tipo: 'error',
+        texto: err.response?.data?.message || 'Error al reiniciar el mapa de la finca'
+      });
+    }
+  };
+
   const handleEliminarLote = async (id: number) => {
     if (!confirm('¿Está seguro de eliminar este lote? Se registrará en la bitácora.')) return;
     try {
@@ -119,10 +158,13 @@ export default function ConfigurarMapaPage() {
             {!loading && (
               <MapaFinca
                 fincaId={finca ? String(finca.id) : ''}
+                nombreFinca={finca?.nombre || 'Finca Lodana'}
                 perimetroInicial={finca?.poligonoPerimetro}
                 lotesExistentes={lotes as any}
                 onGuardarPerimetro={handleGuardarPerimetro}
                 onCrearLote={handleCrearLote}
+                onActualizarLote={handleActualizarLote}
+                onEliminarMapaCompleto={handleEliminarMapaCompleto}
               />
             )}
           </Card>

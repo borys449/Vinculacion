@@ -13,6 +13,22 @@ export interface Lote {
     tipo: string;
     area: string;
   };
+  cultivos?: Array<{
+    id: number;
+    nombre: string;
+    tipo: string;
+    area: number;
+    unidad: string;
+    estado: string;
+  }>;
+  ganado?: Array<{
+    id: number;
+    identificacion: string;
+    tipo: string;
+    raza?: string;
+    especie?: string;
+    proposito?: string;
+  }>;
 }
 
 export interface Finca {
@@ -31,6 +47,11 @@ export const fincaService = {
 
   actualizarPerimetro: async (poligonoPerimetro: any, nombre?: string) => {
     const response = await api.put('/fincas/mi-finca/perimetro', { poligonoPerimetro, nombre });
+    return response.data;
+  },
+
+  eliminarMapaCompleto: async () => {
+    const response = await api.delete('/fincas/mi-finca/mapa');
     return response.data;
   },
 

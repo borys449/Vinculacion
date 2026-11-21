@@ -1,4 +1,10 @@
-const { Lote, Usuario, Registro, Cultivo, Ganado } = require('../models');
+const { Lote, Usuario, Registro, Cultivo, Ganado, Finca } = require('../models');
+const {
+  validateLoteInsideFinca,
+  validateNoOverlap,
+  clampAndAdaptPolygonToFincaAndLotes,
+  extractPolygonCoordinates,
+} = require('../utils/geoSpatial');
 
 // Función auxiliar para validar permisos según la rama (agricultura vs ganadería)
 const puedeGestionarRama = (usuario, tipoLote) => {
@@ -20,6 +26,16 @@ exports.obtenerLotes = async (req, res) => {
           model: Usuario,
           as: 'creadoPor',
           attributes: ['id', 'nombre', 'tipo', 'area']
+        },
+        {
+          model: Cultivo,
+          as: 'cultivos',
+          attributes: ['id', 'nombre', 'tipo', 'area', 'unidad', 'estado']
+        },
+        {
+          model: Ganado,
+          as: 'ganado',
+          attributes: ['id', 'identificacion', 'tipo', 'raza', 'especie', 'proposito']
         }
       ],
       order: [['fechaRegistro', 'ASC']]
@@ -53,6 +69,16 @@ exports.obtenerLote = async (req, res) => {
           model: Usuario,
           as: 'creadoPor',
           attributes: ['id', 'nombre', 'tipo', 'area']
+        },
+        {
+          model: Cultivo,
+          as: 'cultivos',
+          attributes: ['id', 'nombre', 'tipo', 'area', 'unidad', 'estado']
+        },
+        {
+          model: Ganado,
+          as: 'ganado',
+          attributes: ['id', 'identificacion', 'tipo', 'raza', 'especie', 'proposito']
         }
       ]
     });
@@ -105,10 +131,32 @@ exports.crearLote = async (req, res) => {
       });
     }
 
+    let geometriaFinal = geometria;
+
+    // Regla de negocio: Auto-adaptar y alinear la geometría al perímetro y lotes vecinos
+    if (req.usuario.fincaId) {
+      const finca = await Finca.findByPk(req.usuario.fincaId);
+      const fincaCoords = finca ? extractPolygonCoordinates(finca.poligonoPerimetro) : null;
+      const lotesExistentes = await Lote.findAll({ where: { fincaId: req.usuario.fincaId } });
+
+      const rawCoords = extractPolygonCoordinates(geometria);
+      if (rawCoords) {
+        const adaptedCoords = clampAndAdaptPolygonToFincaAndLotes(rawCoords, fincaCoords, lotesExistentes);
+        geometriaFinal = {
+          type: 'Feature',
+          properties: (geometria && geometria.properties) || {},
+          geometry: {
+            type: 'Polygon',
+            coordinates: [adaptedCoords]
+          }
+        };
+      }
+    }
+
     const nuevoLote = await Lote.create({
       nombre,
       tipo,
-      geometria,
+      geometria: geometriaFinal,
       fincaId: req.usuario.fincaId,
       creadoPorId: req.usuario.id
     });
@@ -173,6 +221,25 @@ exports.actualizarLote = async (req, res) => {
         success: false,
         message: `No tiene permiso para cambiar el lote a la rama ${req.body.tipo}.`
       });
+    }
+
+    // Regla de negocio: Auto-adaptar y alinear la geometría al perímetro y lotes vecinos
+    if (req.body.geometria && req.usuario.fincaId) {
+      const finca = await Finca.findByPk(req.usuario.fincaId);
+      const fincaCoords = finca ? extractPolygonCoordinates(finca.poligonoPerimetro) : null;
+      const lotesExistentes = await Lote.findAll({ where: { fincaId: req.usuario.fincaId } });
+      const rawCoords = extractPolygonCoordinates(req.body.geometria);
+      if (rawCoords) {
+        const adaptedCoords = clampAndAdaptPolygonToFincaAndLotes(rawCoords, fincaCoords, lotesExistentes, lote.id);
+        req.body.geometria = {
+          type: 'Feature',
+          properties: (req.body.geometria && req.body.geometria.properties) || {},
+          geometry: {
+            type: 'Polygon',
+            coordinates: [adaptedCoords]
+          }
+        };
+      }
     }
 
     const datosAnteriores = `${lote.nombre} (${lote.tipo})`;
